@@ -669,9 +669,7 @@ begin
 end;
 
 procedure TMainForm.DoUpdateScrollingLimits;
-var
-  Targets: array of TAniCalculations.TTarget;
-  W,H: Single;
+var Targets: array of TAniCalculations.TTarget;
 begin
 
   if FAniCalc <> nil then
@@ -691,8 +689,6 @@ begin
 
   end;
 
-//  if not HasTouchTracking then
-//    UpdateScrollBar;
 end;
 
 end.
