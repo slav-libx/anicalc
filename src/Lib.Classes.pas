@@ -66,7 +66,7 @@ uses
 {$ENDIF}
 
 { TPicture }
-
+
 constructor TPicture.Create(AOwner: TComponent);
 begin
   inherited;
