@@ -3,7 +3,7 @@ program anicalc;
 uses
   System.StartUpCopy,
   FMX.Forms,
-  FormMain in 'src\FormMain.pas' {MainForm},
+  Form.Main in 'src\Form.Main.pas' {MainForm},
   Lib.Classes in 'src\Lib.Classes.pas';
 
 {$R *.res}

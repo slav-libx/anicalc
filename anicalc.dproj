@@ -396,7 +396,7 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="src\FormMain.pas">
+        <DCCReference Include="src\Form.Main.pas">
             <Form>MainForm</Form>
             <FormType>fmx</FormType>
         </DCCReference>
