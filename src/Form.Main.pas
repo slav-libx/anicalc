@@ -581,6 +581,7 @@ begin
 //  Canvas.DrawLine(PointF(ARect.Left,I*40-0.5),PointF(ARect.Right,I*40-0.5),0.3);
 
 //  Canvas.DrawLine(Rectangle2.PressedPosition,Rectangle2.PressedPosition-FAniCalc.ViewportPositionF,1);
+
 end;
 
 procedure TMainForm.AniCalcChange(Sender: TObject);
