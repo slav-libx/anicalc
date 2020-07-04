@@ -8,13 +8,13 @@ uses
   System.UITypes,
   System.UIConsts,
   System.Classes,
-  System.IOUtils,
   System.Generics.Collections,
-  System.Permissions,
+  System.Math,
   FMX.Types,
   FMX.Ani,
   FMX.Graphics,
-  FMX.Objects;
+  FMX.Objects,
+  Lib.Files;
 
 type
   TPicture = class(TRectangle)
@@ -29,6 +29,7 @@ type
     PictureFileName: string;
     PictureIndex: Integer;
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure SetBitmap(B: TBitmap);
     procedure ReleaseBitmap;
     function Empty: Boolean;
@@ -39,8 +40,6 @@ type
   end;
 
   TPictureQueue = TThreadedQueue<TPicture>;
-
-  TPictureList = TList<TPicture>;
 
   TPictureReader = class(TThread)
   private
@@ -54,18 +53,33 @@ type
     procedure Push(Picture: TPicture);
   end;
 
-procedure RequestPermissionsExternalStorage(Proc: TProc<Boolean>);
+  TPictureList = class(TObjectList<TPicture>)
+  private const
+    PICTURES_MARGIN = 10;
+  private
+    FFeedMode: Boolean;
+    FSize: TPointF;
+    Cache: TList<TPicture>;
+    PictureReader: TPictureReader;
+    procedure AddPicture(const PictureFileName: string);
+    procedure ToCache(Picture: TPicture);
+    procedure OnPictureRead(Sender: TObject);
+    procedure OnPicturePaint(Sender: TObject; Canvas: TCanvas; const ARect: TRectF);
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure ReadDirectory(const Directory: string);
+    function PictureOf(PictureIndex: Integer): TPicture;
+    function AtPoint(const Point: TPointF): TPicture;
+    function IndexAtPoint(const Point: TPointF): Integer;
+    procedure Placement(FeedMode: Boolean; const PaddingRect: TRectF; const PageSize: TPointF);
+    property FeedMode: Boolean read FFeedMode;
+    property Size: TPointF read FSize;
+  end;
 
 implementation
 
-{$IFDEF ANDROID}
-
-uses
-  Androidapi.Helpers, Androidapi.JNI.Os;
-
-{$ENDIF}
-
-{ TPicture }
+{ TPicture }
 
 constructor TPicture.Create(AOwner: TComponent);
 begin
@@ -81,6 +95,11 @@ begin
   HitTest:=False;
   Opacity:=0.8;
 
+end;
+
+destructor TPicture.Destroy;
+begin
+  inherited;
 end;
 
 procedure TPicture.AfterPaint;
@@ -114,17 +133,23 @@ end;
 procedure TPicture.SetBitmap(B: TBitmap);
 begin
 
-  BeginUpdate;
+  TThread.Synchronize(nil,procedure
+  begin
 
-  Opacity:=0;
+    BeginUpdate;
 
-  Fill.Bitmap.Bitmap:=B;
-  Fill.Kind:=TBrushKind.Bitmap;
-  State:=StateLoaded;
+    Opacity:=0;
 
-  EndUpdate;
+    Fill.Bitmap.Bitmap:=B;
+    Fill.Kind:=TBrushKind.Bitmap;
 
-  TAnimator.AnimateFloat(Self,'Opacity',0.8);
+    State:=StateLoaded;
+
+    TAnimator.AnimateFloat(Self,'Opacity',0.8);
+
+    EndUpdate;
+
+  end);
 
 end;
 
@@ -135,6 +160,7 @@ begin
 
   Fill.Kind:=TBrushKind.None;
   Fill.Bitmap.Bitmap:=nil;
+
   State:=StateEmpty;
 
   EndUpdate;
@@ -181,10 +207,7 @@ begin
 
     var B:=TBitmap.CreateFromFile(Picture.PictureFileName);
 
-    Synchronize(procedure
-    begin
-      Picture.SetBitmap(B);
-    end);
+    Picture.SetBitmap(B);
 
     B.Free;
 
@@ -192,25 +215,176 @@ begin
 
 end;
 
-procedure RequestPermissionsExternalStorage(Proc: TProc<Boolean>);
+{ TPictureList }
+
+constructor TPictureList.Create;
+begin
+  inherited Create(True);
+  Cache:=TList<TPicture>.Create;
+  PictureReader:=TPictureReader.Create;
+  PictureReader.Start;
+end;
+
+destructor TPictureList.Destroy;
+begin
+  PictureReader.DoShutDown;
+  Cache.Free;
+  inherited;
+end;
+
+function TPictureList.PictureOf(PictureIndex: Integer): TPicture;
+begin
+  if InRange(PictureIndex,0,Count-1) then
+    Result:=Items[PictureIndex]
+  else
+    Result:=nil;
+end;
+
+function TPictureList.AtPoint(const Point: TPointF): TPicture;
 begin
 
-  {$IFDEF ANDROID}
+  Result:=nil;
 
-  var WRITE_EXTERNAL_STORAGE:=JStringToString(TJManifest_permission.JavaClass.WRITE_EXTERNAL_STORAGE);
-
-  {$ELSE}
-
-  var WRITE_EXTERNAL_STORAGE:='';
-
-  {$ENDIF}
-
-  PermissionsService.DefaultService.RequestPermissions([WRITE_EXTERNAL_STORAGE],
-  procedure(const APermissions: TArray<string>; const AGrantResults: TArray<TPermissionStatus>)
-  begin
-    Proc((Length(AGrantResults)=1) and (AGrantResults[0]=TPermissionStatus.Granted));
-  end);
+  for var Picture in Self do
+  if Picture.BoundsRect.Contains(Point) then Exit(Picture);
 
 end;
-
+
+function DistanceRect(const R: TRectF; const P: TPointF): Single;
+begin
+  if R.Contains(P) then
+    Result:=0
+  else
+    Result:=R.CenterPoint.Distance(P)-R.Width/2;
+end;
+
+function TPictureList.IndexAtPoint(const Point: TPointF): Integer;
+var D,Distance: Single;
+begin
+
+  Result:=-1;
+
+  for var I:=0 to Count-1 do
+  begin
+    Distance:=DistanceRect(Items[I].BoundsRect,Point);
+    if (I=0) or (Distance<D) then Result:=I;
+    D:=Distance;
+  end;
+
+end;
+
+procedure TPictureList.Placement(FeedMode: Boolean; const PaddingRect: TRectF; const PageSize: TPointF);
+var PageRect,PageBounds,PictureRect: TRectF;
+begin
+
+  FFeedMode:=FeedMode;
+
+  PageRect:=TRectF.Create(PaddingRect.TopLeft,PageSize.X,PageSize.Y-
+    PaddingRect.Top-PaddingRect.Bottom);
+
+  for var Picture in Self do
+  begin
+
+    PictureRect:=RectF(0,0,Picture.BitmapSize.X,Picture.BitmapSize.Y).
+      PlaceInto(PageRect,THorzRectAlign.Center,TVertRectAlign.Center);
+
+    if FeedMode then
+    begin
+      PictureRect.SetLocation(PageRect.Left,PictureRect.Top);
+      PageBounds:=PageRect.CenterAt(PictureRect);
+      PageRect.SetLocation(PictureRect.Right+PICTURES_MARGIN,PageRect.Top);
+    end else begin
+      PageBounds:=PageRect;
+      PageRect.Offset(PageRect.Width+PICTURES_MARGIN,0)
+    end;
+
+    Picture.BoundsRect:=PictureRect.SnapToPixel(0);
+    Picture.PageBounds:=PageBounds;
+
+  end;
+
+  FSize:=PointF(PageRect.Left-PICTURES_MARGIN,PageRect.Bottom)+PaddingRect.BottomRight;
+
+end;
+
+procedure TPictureList.ToCache(Picture: TPicture);
+begin
+
+  if (Picture=nil) or ((Cache.Count>0) and (Cache.Last=Picture)) then Exit;
+
+  Cache.Remove(Picture);
+  Cache.Add(Picture);
+
+  while (Cache.Count>20) and Cache[0].Loaded do
+  begin
+    Cache[0].ReleaseBitmap;
+    Cache.Delete(0);
+  end;
+
+end;
+
+function ReadImageSize(const PictureFileName: string; out ImageSize: TPointF): Boolean;
+begin
+
+  ImageSize:=TBitmapCodecManager.GetImageSize(PictureFileName);
+
+  Result:=(ImageSize.X>0) and (ImageSize.Y>0); // is valid picture file
+
+end;
+
+procedure TPictureList.AddPicture(const PictureFileName: string);
+var
+  P: TPicture;
+  ImageSize: TPointF;
+begin
+
+  if ReadImageSize(PictureFileName,ImageSize) then
+  begin
+
+    P:=TPicture.Create(nil);
+
+    P.BitmapSize:=ImageSize;
+    P.PictureIndex:=Count;
+    P.PictureFileName:=PictureFileName;
+    //P.OnRead:=OnPictureRead;
+    P.OnPaint:=OnPicturePaint;
+
+    Add(P);
+
+  end;
+
+end;
+
+procedure TPictureList.ReadDirectory(const Directory: string);
+begin
+  for var F in GetFiles(Directory,False) do AddPicture(F);
+end;
+
+procedure TPictureList.OnPictureRead(Sender: TObject);
+begin
+
+  var Picture:=TPicture(Sender);
+
+  //PictureReader.Push(PictureOf(Picture.PictureIndex-1));
+  PictureReader.Push(Picture);
+  //PictureReader.Push(PictureOf(Picture.PictureIndex+1));
+
+  ToCache(Picture);
+
+end;
+
+procedure TPictureList.OnPicturePaint(Sender: TObject; Canvas: TCanvas; const ARect: TRectF);
+var R: TRectF;
+begin
+
+  var Picture:=TPicture(Sender);
+
+  PictureReader.Push(Picture);
+  //PictureReader.Push(PictureOf(Picture.PictureIndex-1));
+  //PictureReader.Push(PictureOf(Picture.PictureIndex+1));
+
+  ToCache(Picture);
+
+end;
+
 end.

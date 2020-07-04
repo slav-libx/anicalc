@@ -18,7 +18,8 @@ uses
   FMX.Dialogs,
   FMX.InertialMovement,
   FMX.Objects,
-  Lib.Classes;
+  Lib.Classes,
+  Lib.Files;
 
 type
   TMainForm = class(TForm)
@@ -51,36 +52,24 @@ type
     PICTURES_MARGIN = 10;
   private
     FAniCalc: TAniCalculations;
-    FFeedMode: Boolean;
     ContentSize: TPointF;
     Pictures: TPictureList;
-    Cache: TPictureList;
-    PictureReader: TPictureReader;
-    FCurrentPicture: TPicture;
+    CurrentPicture: TPicture;
     FLeave: Boolean;
-    procedure SetCurrentPicture(Value: TPicture);
-    procedure OnPicturePaint(Sender: TObject; Canvas: TCanvas; const ARect: TRectF);
     procedure AniCalcChange(Sender: TObject);
     procedure AniCalcStart(Sender: TObject);
     procedure AniCalcStop(Sender: TObject);
     procedure DoUpdateScrollingLimits;
-    function GetPicturesPath: string;
     procedure LoadPictures;
-    function GetFiles(const PicturesPath: string): TArray<string>;
     function AbsoluteCenterPoint: TPointF;
     function AbsolutePressedPoint: TPointF;
-    procedure AddPicture(const PictureFileName: string);
-    function PictureOf(PictureIndex: Integer): TPicture;
-    procedure OnPictureRead(Sender: TObject);
-    function PictureAt(const AbsolutePoint: TPointF): TPicture;
-    function TryPictureAt(const AbsolutePoint: TPointF; out Picture: TPicture): Boolean;
+    function PictureAtPoint(const AbsolutePoint: TPointF): TPicture;
+    function TryPictureAtPoint(const AbsolutePoint: TPointF; out Picture: TPicture): Boolean;
     function PictureIndexAt(const AbsolutePoint: TPointF): Integer;
     procedure ShowText(const Text: string);
-    procedure ToCache(Picture: TPicture);
-    procedure PlacementPictures(FeedMode: Boolean);
+    procedure PlacementPictures;
     procedure ScrollToPicture(Picture: TPicture; Immediately: Boolean=False); overload;
     procedure ScrollToPicture(PictureIndex: Integer; Immediately: Boolean=False); overload;
-    property CurrentPicture: TPicture read FCurrentPicture write SetCurrentPicture;
   public
   end;
 
@@ -97,9 +86,6 @@ type
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
 
-  PictureReader:=TPictureReader.Create;
-  PictureReader.Start;
-
   FAniCalc:=TAniCalculations.Create(nil);
 
   FAniCalc.TouchTracking:=[{ttVertical,}ttHorizontal];
@@ -110,7 +96,7 @@ begin
   FAniCalc.OnStop:=AniCalcStop;
   FAniCalc.BoundsAnimation:=HasPhysicsStretchyScrolling; // возможен ли выход за границы min-max (если определены min-max)
   FAniCalc.Elasticity:=200; // как быстро возвращать позицию в пределы min-max при выходе за границы (при отпускании пальца/мыши)
-  FAniCalc.DecelerationRate:=2;//15;//10; // скорость замедления прокрутки после отпускании пальца/мыши
+  FAniCalc.DecelerationRate:=3;//15;//10; // скорость замедления прокрутки после отпускании пальца/мыши
   FAniCalc.Averaging:=True;
 
   FAniCalc.AutoShowing:=True;
@@ -119,7 +105,6 @@ begin
   TAniCalculationsAccess(FAniCalc).DeadZone:=10; // смещение после которого происходит инициация анимации, работает только если Averaging=True
 
   Pictures:=TPictureList.Create;
-  Cache:=TPictureList.Create;
 
   RequestPermissionsExternalStorage(
   procedure(Granted: Boolean)
@@ -131,155 +116,25 @@ end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
-  PictureReader.DoShutDown;
   Pictures.Free;
-  Cache.Free;
   FAniCalc.Free;
 end;
 
-procedure RepaintControl(Control: TControl);
-begin
-  if Control<>nil then Control.Repaint;
-end;
-
-procedure TMainForm.SetCurrentPicture(Value: TPicture);
-var P: TPicture;
-begin
-  if Value<>CurrentPicture then
-  begin
-    P:=FCurrentPicture;
-    FCurrentPicture:=Value;
-    RepaintControl(CurrentPicture);
-    RepaintControl(P);
-  end;
-end;
-
-procedure TMainForm.ToCache(Picture: TPicture);
-begin
-
-  if Picture=nil then Exit;
-
-  Cache.Remove(Picture);
-  Cache.Add(Picture);
-
-  while (Cache.Count>20) and Cache[0].Loaded do
-  begin
-    Cache[0].ReleaseBitmap;
-    Cache.Delete(0);
-  end;
-
-end;
-
-procedure TMainForm.OnPictureRead(Sender: TObject);
-begin
-
-  var Picture:=TPicture(Sender);
-
-  //PictureReader.Push(PictureOf(Picture.PictureIndex-1));
-  PictureReader.Push(Picture);
-  //PictureReader.Push(PictureOf(Picture.PictureIndex+1));
-
-  ToCache(Picture);
-
-end;
-
-procedure TMainForm.OnPicturePaint(Sender: TObject; Canvas: TCanvas; const ARect: TRectF);
-var R: TRectF;
-begin
-
-  var Picture:=TPicture(Sender);
-
-  if Picture.Empty then
-  begin
-    PictureReader.Push(Picture);
-    ToCache(Picture);
-  end;
-
-  if Picture=CurrentPicture then
-  begin
-
-    Canvas.Stroke.Kind:=TBrushKind.Solid;
-    Canvas.Stroke.Thickness:=2;
-    Canvas.Stroke.Color:=claRed;
-
-    R:=ARect;
-    R.Inflate(-10,-10);
-
-    //Canvas.DrawRect(R,0,0,AllCorners,1);
-
-  end;
-
-end;
-
-procedure TMainForm.AddPicture(const PictureFileName: string);
-var
-  R: TPicture;
-  S: TPointF;
-begin
-
-  S:=TBitmapCodecManager.GetImageSize(PictureFileName);
-
-  if (S.X>0) and (S.Y>0) then // is picture file
-  begin
-
-    R:=TPicture.Create(Self);
-
-    R.BitmapSize:=S;
-    R.PictureIndex:=Pictures.Count;
-    R.PictureFileName:=PictureFileName;
-    //R.OnRead:=OnPictureRead;
-    R.OnPaint:=OnPicturePaint;
-
-    Pictures.Add(R);
-
-  end;
-
-end;
-
-procedure TMainForm.PlacementPictures(FeedMode: Boolean);
-var
-  PaddingRect,PageRect,PageBounds,PictureRect: TRectF;
-  PageSize: TPointF;
+procedure TMainForm.PlacementPictures;
+var FeedMode: Boolean;
 begin
 
   if Pictures=nil then Exit;
 
-  FFeedMode:=FeedMode;
-
-  PaddingRect:=ScrollContent.Padding.Rect;
-
-  PageSize:=Rectangle2.BoundsRect.BottomRight;
+  FeedMode:=Rectangle2.Width>Rectangle2.Height*1.5;
 
   ScrollContent.BeginUpdate;
 
-  PageRect:=TRectF.Create(PaddingRect.TopLeft,PageSize.X,PageSize.Y-
-    PaddingRect.Top-PaddingRect.Bottom);
+  Pictures.Placement(FeedMode,ScrollContent.Padding.Rect,Rectangle2.BoundsRect.BottomRight);
 
-  for var Picture in Pictures do
-  begin
+  for var Picture in Pictures do ScrollContent.AddObject(Picture);
 
-    PictureRect:=RectF(0,0,Picture.BitmapSize.X,Picture.BitmapSize.Y).
-      PlaceInto(PageRect,THorzRectAlign.Center,TVertRectAlign.Center);
-
-    if FeedMode then
-    begin
-      PictureRect.SetLocation(PageRect.Left,PictureRect.Top);
-      PageBounds:=PageRect.CenterAt(PictureRect);
-      PageRect.SetLocation(PictureRect.Right+PICTURES_MARGIN,PageRect.Top);
-    end else begin
-      PageBounds:=PageRect;
-      PageRect.Offset(PageRect.Width+PICTURES_MARGIN,0)
-    end;
-
-    Picture.BoundsRect:=PictureRect.SnapToPixel(0);
-    Picture.PageBounds:=PageBounds;
-
-    ScrollContent.AddObject(Picture);
-
-  end;
-
-  ScrollContent.Size.Size:=PointF(PageRect.Left-PICTURES_MARGIN,PageRect.Bottom)+
-    PaddingRect.BottomRight;
+  ScrollContent.Size.Size:=Pictures.Size;
 
   ScrollContent.EndUpdate;
 
@@ -289,40 +144,10 @@ begin
 
 end;
 
-function TMainForm.GetFiles(const PicturesPath: string): TArray<string>;
-begin
-
-  Result:=TDirectory.GetFiles(PicturesPath);
-
-  for var Directory in TDirectory.GetDirectories(PicturesPath,
-  function(const Path: string; const SearchRec: TSearchRec): Boolean
-  begin
-    Result:=not string(SearchRec.Name).StartsWith('.');
-  end)
-
-  do Result:=Result+GetFiles(Directory);
-
-end;
-
-function TMainForm.GetPicturesPath: string;
-begin
-
-  {$IFDEF ANDROID}
-
-  Result:=System.IOUtils.TPath.GetSharedPicturesPath;
-
-  {$ELSE}
-
-  Result:=System.IOUtils.TPath.GetPicturesPath;
-
-  {$ENDIF}
-
-end;
-
 procedure TMainForm.LoadPictures;
 begin
 
-  for var F in GetFiles(GetPicturesPath) do AddPicture(F);
+  Pictures.ReadDirectory(GetPicturesPath);
 
   Rectangle2.RecalcSize;
 
@@ -340,58 +165,20 @@ begin
   Result:=Rectangle2.LocalToAbsolute(Rectangle2.PressedPosition);
 end;
 
-function TMainForm.PictureOf(PictureIndex: Integer): TPicture;
+function TMainForm.PictureAtPoint(const AbsolutePoint: TPointF): TPicture;
 begin
-  if InRange(PictureIndex,0,Pictures.Count-1) then
-    Result:=Pictures[PictureIndex]
-  else
-    Result:=nil;
+  Result:=Pictures.AtPoint(ScrollContent.AbsoluteToLocal(AbsolutePoint));
 end;
 
-function TMainForm.PictureAt(const AbsolutePoint: TPointF): TPicture;
-var P: TPointF;
+function TMainForm.TryPictureAtPoint(const AbsolutePoint: TPointF; out Picture: TPicture): Boolean;
 begin
-
-  Result:=nil;
-
-  P:=ScrollContent.AbsoluteToLocal(AbsolutePoint);
-
-  for var Picture in Pictures do
-  if Picture.BoundsRect.Contains(P) then Exit(Picture);
-
-end;
-
-function TMainForm.TryPictureAt(const AbsolutePoint: TPointF; out Picture: TPicture): Boolean;
-begin
-  Picture:=PictureAt(AbsolutePoint);
+  Picture:=PictureAtPoint(AbsolutePoint);
   Result:=Assigned(Picture);
 end;
 
-function DistanceRect(const R: TRectF; const P: TPointF): Single;
-begin
-  if R.Contains(P) then
-    Result:=0
-  else
-    Result:=R.CenterPoint.Distance(P)-R.Width/2;
-end;
-
 function TMainForm.PictureIndexAt(const AbsolutePoint: TPointF): Integer;
-var
-  P: TPointF;
-  D,Distance: Single;
 begin
-
-  Result:=-1;
-
-  P:=ScrollContent.AbsoluteToLocal(AbsolutePoint);
-
-  for var I:=0 to Pictures.Count-1 do
-  begin
-    Distance:=DistanceRect(Pictures[I].BoundsRect,P);
-    if (I=0) or (Distance<D) then Result:=I;
-    D:=Distance;
-  end;
-
+  Result:=Pictures.IndexAtPoint(ScrollContent.AbsoluteToLocal(AbsolutePoint));
 end;
 
 procedure TMainForm.ScrollToPicture(Picture: TPicture; Immediately: Boolean);
@@ -413,7 +200,7 @@ end;
 
 procedure TMainForm.ScrollToPicture(PictureIndex: Integer; Immediately: Boolean);
 begin
-  ScrollToPicture(PictureOf(PictureIndex),Immediately);
+  ScrollToPicture(Pictures.PictureOf(PictureIndex),Immediately);
 end;
 
 procedure TMainForm.ShowText(const Text: string);
@@ -424,7 +211,7 @@ end;
 
 procedure TMainForm.Rectangle2Resized(Sender: TObject);
 begin
-  PlacementPictures(Rectangle2.Width>Rectangle2.Height*1.5);
+  PlacementPictures;
   ScrollToPicture(CurrentPicture,True);
 end;
 
@@ -432,7 +219,7 @@ procedure TMainForm.Rectangle2Click(Sender: TObject);
 var Picture: TPicture;
 begin
   if not FAniCalc.Moved then
-  if TryPictureAt(AbsolutePressedPoint,Picture) then
+  if TryPictureAtPoint(AbsolutePressedPoint,Picture) then
   begin
     ScrollToPicture(Picture);
     FLeave:=True;
@@ -533,7 +320,7 @@ begin
 
     FAniCalc.MouseUp(X, Y);
 
-    if not FFeedMode then
+    if not Pictures.FeedMode then
     begin
 
       if Abs(FAniCalc.CurrentVelocity.X)<100 then
@@ -657,8 +444,8 @@ begin
 //  TAnimator.AnimateFloat(FScrollBar, 'Opacity', 0, 0.2);
 //
 
-    if not FLeave and FFeedMode then
-    CurrentPicture:=PictureOf(PictureIndexAt(AbsoluteCenterPoint));
+    if not FLeave and Pictures.FeedMode then
+    CurrentPicture:=Pictures.PictureOf(PictureIndexAt(AbsoluteCenterPoint));
 
     TAniCalculationsAccess(FAniCalc).Shown:=False;
 

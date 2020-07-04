@@ -3,7 +3,7 @@ object MainForm: TMainForm
   Top = 0
   Caption = 'Form1'
   ClientHeight = 420
-  ClientWidth = 669
+  ClientWidth = 1111
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -14,7 +14,7 @@ object MainForm: TMainForm
     Touch.InteractiveGestures = [Pan]
     OnGesture = Rectangle2Gesture
     Align = Contents
-    Size.Width = 669.000000000000000000
+    Size.Width = 1111.000000000000000000
     Size.Height = 420.000000000000000000
     Size.PlatformDefault = False
     Stroke.Kind = None
@@ -48,7 +48,7 @@ object MainForm: TMainForm
     Fill.Kind = None
     Padding.Left = 1.000000000000000000
     Padding.Right = 1.000000000000000000
-    Position.X = 663.000000000000000000
+    Position.X = 1105.000000000000000000
     Size.Width = 6.000000000000000000
     Size.Height = 414.000000000000000000
     Size.PlatformDefault = False
@@ -75,7 +75,7 @@ object MainForm: TMainForm
     Padding.Top = 1.000000000000000000
     Padding.Bottom = 1.000000000000000000
     Position.Y = 414.000000000000000000
-    Size.Width = 669.000000000000000000
+    Size.Width = 1111.000000000000000000
     Size.Height = 6.000000000000000000
     Size.PlatformDefault = False
     Stroke.Kind = None
