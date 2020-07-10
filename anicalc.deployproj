@@ -12,7 +12,7 @@
     </PropertyGroup>
     <ItemGroup Condition="'$(Platform)'=='iOSDevice64'"/>
     <ItemGroup Condition="'$(Platform)'=='Win64'">
-        <DeployFile Include="Win64\Debug\anicalc.exe" Condition="'$(Config)'=='Debug'">
+        <DeployFile Include="anicalc.exe" Condition="'$(Config)'=='Release'">
             <RemoteDir>anicalc\</RemoteDir>
             <RemoteName>anicalc.exe</RemoteName>
             <DeployClass>ProjectOutput</DeployClass>
@@ -22,7 +22,7 @@
             <Overwrite>True</Overwrite>
             <Required>True</Required>
         </DeployFile>
-        <DeployFile Include="Win64\Release\anicalc.exe" Condition="'$(Config)'=='Release'">
+        <DeployFile Include="anicalc.exe" Condition="'$(Config)'=='Debug'">
             <RemoteDir>anicalc\</RemoteDir>
             <RemoteName>anicalc.exe</RemoteName>
             <DeployClass>ProjectOutput</DeployClass>

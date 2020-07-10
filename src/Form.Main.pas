@@ -18,7 +18,9 @@ uses
   FMX.Dialogs,
   FMX.InertialMovement,
   FMX.Objects,
+  Lib.Log,
   Lib.Classes,
+  Lib.Pictures,
   Lib.Files;
 
 type
@@ -46,6 +48,8 @@ type
     procedure Rectangle2Gesture(Sender: TObject;
       const EventInfo: TGestureEventInfo; var Handled: Boolean);
     procedure Rectangle2Click(Sender: TObject);
+    procedure Rectangle5Painting(Sender: TObject; Canvas: TCanvas;
+      const ARect: TRectF);
   private const
     PhysicsProcessingInterval = 8; // 8 ms for ~120 frames per second
     HasPhysicsStretchyScrolling = True;
@@ -53,9 +57,12 @@ type
   private
     FAniCalc: TAniCalculations;
     ContentSize: TPointF;
-    Pictures: TPictureList;
-    CurrentPicture: TPicture;
+    Views: TPictureList;
+    CurrentView: TView;
     FLeave: Boolean;
+    FAnimated: Boolean;
+    FDownPoint: TPointF;
+    FScrollType: (stNone,stHScroll,stVScroll,stBoth);
     procedure AniCalcChange(Sender: TObject);
     procedure AniCalcStart(Sender: TObject);
     procedure AniCalcStop(Sender: TObject);
@@ -63,13 +70,14 @@ type
     procedure LoadPictures;
     function AbsoluteCenterPoint: TPointF;
     function AbsolutePressedPoint: TPointF;
-    function PictureAtPoint(const AbsolutePoint: TPointF): TPicture;
-    function TryPictureAtPoint(const AbsolutePoint: TPointF; out Picture: TPicture): Boolean;
-    function PictureIndexAt(const AbsolutePoint: TPointF): Integer;
+    function ViewAtPoint(const AbsolutePoint: TPointF): TView;
+    function TryViewAtPoint(const AbsolutePoint: TPointF; out View: TView): Boolean;
+    function ViewIndexAt(const AbsolutePoint: TPointF): Integer;
     procedure ShowText(const Text: string);
     procedure PlacementPictures;
-    procedure ScrollToPicture(Picture: TPicture; Immediately: Boolean=False); overload;
-    procedure ScrollToPicture(PictureIndex: Integer; Immediately: Boolean=False); overload;
+    procedure ScrollToView(View: TView; Immediately: Boolean=False); overload;
+    procedure ScrollToView(ViewIndex: Integer; Immediately: Boolean=False); overload;
+    function GetScrollPoint(X,Y: Single): TPointF;
   public
   end;
 
@@ -86,9 +94,13 @@ type
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
 
+  {$IFDEF MSWINDOWS}
+  InitLog(System.IOUtils.TPath.GetLibraryPath);
+  {$ENDIF}
+
   FAniCalc:=TAniCalculations.Create(nil);
 
-  FAniCalc.TouchTracking:=[{ttVertical,}ttHorizontal];
+  FAniCalc.TouchTracking:=[ttVertical,ttHorizontal];
   FAniCalc.Animation:=True;
   FAniCalc.OnChanged:=AniCalcChange;
   FAniCalc.Interval:=PhysicsProcessingInterval; // как часто обновлять позицию по таймеру
@@ -104,7 +116,11 @@ begin
 //  TAniCalculationsAccess(FAniCalc).StorageTime:=0.1;//1000;
   TAniCalculationsAccess(FAniCalc).DeadZone:=10; // смещение после которого происходит инициация анимации, работает только если Averaging=True
 
-  Pictures:=TPictureList.Create;
+  FAnimated:=False;
+
+  Views:=TPictureList.Create;
+
+  Views.ViewMode:=vmTumbs;
 
   RequestPermissionsExternalStorage(
   procedure(Granted: Boolean)
@@ -116,42 +132,61 @@ end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
-  Pictures.Free;
+  Views.Free;
   FAniCalc.Free;
 end;
 
 procedure TMainForm.PlacementPictures;
-var FeedMode: Boolean;
+var PageSize,ViewSize: TPointF;
 begin
 
-  if Pictures=nil then Exit;
+  if Views=nil then Exit;
 
-  FeedMode:=Rectangle2.Width>Rectangle2.Height*1.5;
+  if Views.ViewMode in [vmSingle,vmFeed] then
+  if Rectangle2.Width>Rectangle2.Height*1.5 then
+    Views.ViewMode:=vmFeed
+  else
+    Views.ViewMode:=vmSingle;
+
+  PageSize:=Rectangle2.BoundsRect.BottomRight;
+
+  if Views.ViewMode=vmTumbs then
+    ViewSize:=PointF(PageSize.X-ScrollContent.Padding.Rect.Left-ScrollContent.Padding.Rect.Right,150)
+  else
+    ViewSize:=PageSize;
 
   ScrollContent.BeginUpdate;
 
-  Pictures.Placement(FeedMode,ScrollContent.Padding.Rect,Rectangle2.BoundsRect.BottomRight);
+  if FAnimated then Views.Save;
 
-  for var Picture in Pictures do ScrollContent.AddObject(Picture);
+  Views.Placement(ScrollContent.Padding.Rect,PageSize,ViewSize);
 
-  ScrollContent.Size.Size:=Pictures.Size;
+  for var View in Views do ScrollContent.AddObject(View);
+
+  ScrollContent.Size.Size:=Views.Size;
 
   ScrollContent.EndUpdate;
 
   DoUpdateScrollingLimits;
 
+  ScrollToView(CurrentView,True);
+
   AniCalcChange(nil);
+
+  Views.Apply(FAnimated);
+
+  FAnimated:=True;
 
 end;
 
 procedure TMainForm.LoadPictures;
 begin
 
-  Pictures.ReadDirectory(GetPicturesPath);
+  Views.ReadDirectory(GetPicturesPath);
 
   Rectangle2.RecalcSize;
 
-  ScrollToPicture(0);
+  ScrollToView(0);
 
 end;
 
@@ -165,42 +200,49 @@ begin
   Result:=Rectangle2.LocalToAbsolute(Rectangle2.PressedPosition);
 end;
 
-function TMainForm.PictureAtPoint(const AbsolutePoint: TPointF): TPicture;
+function TMainForm.ViewAtPoint(const AbsolutePoint: TPointF): TView;
 begin
-  Result:=Pictures.AtPoint(ScrollContent.AbsoluteToLocal(AbsolutePoint));
+  Result:=Views.AtPoint(ScrollContent.AbsoluteToLocal(AbsolutePoint));
 end;
 
-function TMainForm.TryPictureAtPoint(const AbsolutePoint: TPointF; out Picture: TPicture): Boolean;
+function TMainForm.TryViewAtPoint(const AbsolutePoint: TPointF; out View: TView): Boolean;
 begin
-  Picture:=PictureAtPoint(AbsolutePoint);
-  Result:=Assigned(Picture);
+  View:=ViewAtPoint(AbsolutePoint);
+  Result:=Assigned(View);
 end;
 
-function TMainForm.PictureIndexAt(const AbsolutePoint: TPointF): Integer;
+function TMainForm.ViewIndexAt(const AbsolutePoint: TPointF): Integer;
 begin
-  Result:=Pictures.IndexAtPoint(ScrollContent.AbsoluteToLocal(AbsolutePoint));
+  Result:=Views.IndexAtPoint(ScrollContent.AbsoluteToLocal(AbsolutePoint));
 end;
 
-procedure TMainForm.ScrollToPicture(Picture: TPicture; Immediately: Boolean);
+procedure TMainForm.ScrollToView(View: TView; Immediately: Boolean);
 var A: TAniCalculations.TTarget;
 begin
 
-  if Picture=nil then Exit;
+  if View=nil then Exit;
 
-  CurrentPicture:=Picture;
+  CurrentView:=View;
 
   A.TargetType:=TAniCalculations.TTargetType.Other;
-  A.Point:=Picture.PageBounds.TopLeft;
+  A.Point:=View.PageBounds.TopLeft;
 
-  TAniCalculationsAccess(FAniCalc).MouseTarget:=A;
+//  FAniCalc.Animation:=not Immediately;
 
-  if Immediately then FAniCalc.UpdatePosImmediately(True);
+  if Immediately then
+    FAniCalc.ViewportPositionF:=View.PageBounds.TopLeft
+  else
+    TAniCalculationsAccess(FAniCalc).MouseTarget:=A;
+
+//  if Immediately then FAniCalc.UpdatePosImmediately(True);
+
+//  FAniCalc.Animation:=True;
 
 end;
 
-procedure TMainForm.ScrollToPicture(PictureIndex: Integer; Immediately: Boolean);
+procedure TMainForm.ScrollToView(ViewIndex: Integer; Immediately: Boolean);
 begin
-  ScrollToPicture(Pictures.PictureOf(PictureIndex),Immediately);
+  ScrollToView(Views.ViewOf(ViewIndex),Immediately);
 end;
 
 procedure TMainForm.ShowText(const Text: string);
@@ -212,18 +254,33 @@ end;
 procedure TMainForm.Rectangle2Resized(Sender: TObject);
 begin
   PlacementPictures;
-  ScrollToPicture(CurrentPicture,True);
+  ScrollToView(CurrentView,True);
+end;
+
+procedure TMainForm.Rectangle5Painting(Sender: TObject; Canvas: TCanvas;
+  const ARect: TRectF);
+begin
+  Canvas.Fill.Color:=MakeColor($50353535,TControl(Sender).AbsoluteOpacity);
+  Canvas.Fill.Kind:=TBrushKind.Solid;
+  Canvas.FillRect(ARect,0,0,AllCorners,1);
 end;
 
 procedure TMainForm.Rectangle2Click(Sender: TObject);
-var Picture: TPicture;
+var View: TView;
 begin
   if not FAniCalc.Moved then
-  if TryPictureAtPoint(AbsolutePressedPoint,Picture) then
+  //if FScrollType=stNone then
+  if TryViewAtPoint(AbsolutePressedPoint,View) then
   begin
-    ScrollToPicture(Picture);
+    if Views.ViewMode=vmTumbs then
+      Views.ViewMode:=vmSingle
+    else
+      Views.ViewMode:=vmTumbs;
+    CurrentView:=View;
+    PlacementPictures;
+    ScrollToView(View,True);
     FLeave:=True;
-    ShowText(Picture.ToString);
+//    ShowText(View.ToString);
   end;
 end;
 
@@ -241,6 +298,38 @@ begin
 //    TAniCalculationsAccess(FAniCalc).Shown := True;
 //    Handled:=True;
 //  end;
+
+end;
+
+function TMainForm.GetScrollPoint(X,Y: Single): TPointF;
+begin
+
+  Result:=PointF(X,Y);
+
+  if Views.ViewMode=vmTumbs then
+    FScrollType:=stVScroll
+  else
+  if Views.ViewMode=vmFeed then
+    FScrollType:=stHScroll
+  else
+  if FScrollType=stNone then
+  if Abs(FDownPoint.Y-Y)>Abs(FDownPoint.X-X) then
+    FScrollType:=stVScroll
+  else
+    FScrollType:=stHScroll;
+
+//  if FScrollType in [stNone,stHScroll] then
+//  if Abs(FDownPoint.Y-Y)>10 then
+//  begin
+//    FScrollType:=stVScroll;
+//    FDownPoint.X:=X;
+//  end else
+//    FScrollType:=stHScroll;
+
+  case FScrollType of
+  stHScroll: Result.Y:=FDownPoint.Y;
+  stVScroll: Result.X:=FDownPoint.X;
+  end;
 
 end;
 
@@ -262,6 +351,8 @@ begin
   if Assigned(FAniCalc) then
   begin
     FLeave:=False;
+    FDownPoint:=PointF(X,Y);
+    FScrollType:=stNone;
     //FAniCalc.Averaging := ssTouch in Shift;
     FAniCalc.MouseDown(X,Y);
     TAniCalculationsAccess(FAniCalc).Shown:=True;
@@ -279,7 +370,7 @@ begin
 
     TAniCalculationsAccess(FAniCalc).Shown:=False;
 
-    if not FLeave then ScrollToPicture(PictureIndexAt(AbsoluteCenterPoint));
+    if not FLeave then ScrollToView(ViewIndexAt(AbsoluteCenterPoint));
 
     FLeave:=True;
 
@@ -289,6 +380,7 @@ end;
 
 procedure TMainForm.Rectangle2MouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Single);
+var P: TPointF;
 begin
 
 //          if FAniCalc <> nil then
@@ -306,35 +398,43 @@ begin
 //      end;
 
   if (FAniCalc<>nil) and FAniCalc.Down then
-    FAniCalc.MouseMove(X,Y);
+  begin
+    P:=GetScrollPoint(X,Y);
+    FAniCalc.MouseMove(P.X,P.Y);
+  end;
 
 end;
 
 procedure TMainForm.Rectangle2MouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
-var PictureIndex: Integer;
+var
+  P: TPointF;
+  ViewIndex: Integer;
 begin
 
   if FAniCalc <> nil then
   begin
 
-    FAniCalc.MouseUp(X, Y);
+    P:=GetScrollPoint(X,Y);
 
-    if not Pictures.FeedMode then
+    FAniCalc.MouseUp(P.X,P.Y);
+
+    if not FLeave then
+    if Views.ViewMode=vmSingle then
     begin
 
-      if Abs(FAniCalc.CurrentVelocity.X)<100 then
-        PictureIndex:=PictureIndexAt(AbsoluteCenterPoint)
+      if (Abs(FAniCalc.CurrentVelocity.X)<100) and (Abs(FAniCalc.CurrentVelocity.Y)<100) then
+        ViewIndex:=ViewIndexAt(AbsoluteCenterPoint)
       else
 //      if Abs(FAniCalc.CurrentVelocity.X)>2000 then
 //        I:=PictureIndexAt(Rectangle2.LocalToAbsolute(PointF(X+FAniCalc.CurrentVelocity.X/2,Y)))
 //      else
       if FAniCalc.CurrentVelocity.X<0 then
-        PictureIndex:=CurrentPicture.PictureIndex-1
+        ViewIndex:=CurrentView.ViewIndex-1
       else
-        PictureIndex:=CurrentPicture.PictureIndex+1;
+        ViewIndex:=CurrentView.ViewIndex+1;
 
-      ScrollToPicture(EnsureRange(PictureIndex,0,Pictures.Count-1));
+      ScrollToView(EnsureRange(ViewIndex,0,Views.Count-1));
 
     end;
 
@@ -346,7 +446,10 @@ procedure TMainForm.Rectangle2MouseWheel(Sender: TObject; Shift: TShiftState;
   WheelDelta: Integer; var Handled: Boolean);
 begin
   TAniCalculationsAccess(FAniCalc).Shown:=True;
-  FAniCalc.MouseWheel(-WheelDelta/2,0);
+  if Views.ViewMode=vmTumbs then
+    FAniCalc.MouseWheel(0,-WheelDelta/2)
+  else
+    FAniCalc.MouseWheel(-WheelDelta/2,0);
   Handled:=True;
 end;
 
@@ -380,15 +483,21 @@ begin
 
   ScrollContent.Position.Point:=-FAniCalc.ViewportPositionF;
 
-  Rectangle4.Height:=Max(100,Rectangle1.Height*Rectangle2.Height/ScrollContent.Height);
-  Rectangle4.Position.Y:=(Rectangle1.Height-Rectangle4.Height)*(FAniCalc.ViewportPositionF.Y/ContentSize.Y);
+  if ContentSize.Y>0 then
+  begin
+    Rectangle4.Height:=Max(100,Rectangle1.Height*Rectangle2.Height/ScrollContent.Height);
+    Rectangle4.Position.Y:=(Rectangle1.Height-Rectangle4.Height)*(FAniCalc.ViewportPositionF.Y/ContentSize.Y);
+    Rectangle1.Opacity:=FAniCalc.Opacity;
+  end else
+    Rectangle1.Opacity:=0;
 
-  Rectangle1.Opacity:=FAniCalc.Opacity;
-
-  Rectangle6.Width:=Max(100,Rectangle5.Width*Rectangle2.Width/ScrollContent.Width);
-  Rectangle6.Position.X:=(Rectangle5.Width-Rectangle6.Width)*(FAniCalc.ViewportPositionF.X/ContentSize.X);
-
-  Rectangle5.Opacity:=FAniCalc.Opacity;
+  if ContentSize.X>0 then
+  begin
+    Rectangle6.Width:=Max(100,Rectangle5.Width*Rectangle2.Width/ScrollContent.Width);
+    Rectangle6.Position.X:=(Rectangle5.Width-Rectangle6.Width)*(FAniCalc.ViewportPositionF.X/ContentSize.X);
+    Rectangle5.Opacity:=FAniCalc.Opacity;
+  end else
+    Rectangle5.Opacity:=0;
 
 //  Rectangle2.InvalidateRect(TRectF.Create(Rectangle2.PressedPosition,Rectangle2.PressedPosition-FAniCalc.ViewportPositionF));
 
@@ -430,7 +539,7 @@ begin
 //    DisableHitTestForControl(FScrollBar);
 //
 
-    (Self as IScene).ChangeScrollingState(Rectangle2, True);
+    (Self as IScene).ChangeScrollingState(Rectangle2,True);
 //
 //  FStateFlags := FStateFlags + [TStateFlag.NeedsScrollBarDisplay, TStateFlag.ScrollingActive];
 end;
@@ -444,8 +553,8 @@ begin
 //  TAnimator.AnimateFloat(FScrollBar, 'Opacity', 0, 0.2);
 //
 
-    if not FLeave and Pictures.FeedMode then
-    CurrentPicture:=Pictures.PictureOf(PictureIndexAt(AbsoluteCenterPoint));
+    if not FLeave and (Views.ViewMode=vmFeed) then
+    CurrentView:=Views.ViewOf(ViewIndexAt(AbsoluteCenterPoint));
 
     TAniCalculationsAccess(FAniCalc).Shown:=False;
 
@@ -459,10 +568,10 @@ procedure TMainForm.DoUpdateScrollingLimits;
 var Targets: array of TAniCalculations.TTarget;
 begin
 
-  if FAniCalc <> nil then
+  if FAniCalc<>nil then
   begin
 
-    SetLength(Targets, 2);
+    SetLength(Targets,2);
 
     ContentSize.X:=Max(0,ScrollContent.Width-Rectangle2.Width);
     ContentSize.Y:=Max(0,ScrollContent.Height-Rectangle2.Height);

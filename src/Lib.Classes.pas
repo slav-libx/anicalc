@@ -11,77 +11,64 @@ uses
   System.Generics.Collections,
   System.Math,
   FMX.Types,
-  FMX.Ani,
   FMX.Graphics,
   FMX.Objects,
-  Lib.Files;
+  FMX.Ani,
+  FMX.Utils,
+  FMX.Controls,
+  Lib.Ani;
 
 type
-  TPicture = class(TRectangle)
-  private
+
+  TView = class(TRectangle)
+  protected
     State: (StateEmpty,StateLoading,StateLoaded);
   protected
     FOnRead: TNotifyEvent;
     procedure AfterPaint; override;
+    procedure Animate(Time: Single);
   public
-    BitmapSize: TPointF;
+    StartBounds: TRectF;
+    ViewBounds: TRectF;
     PageBounds: TRectF;
-    PictureFileName: string;
-    PictureIndex: Integer;
+    SourceSize: TPointF;
+    Group: string;
+    ViewIndex: Integer;
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure SetBitmap(B: TBitmap);
-    procedure ReleaseBitmap;
     function Empty: Boolean;
     function Loaded: Boolean;
     procedure Loading;
     function ToString: string; override;
     property OnRead: TNotifyEvent read FOnRead write FOnRead;
   end;
+
+  TViewMode = (vmSingle,vmFeed,vmTumbs);
 
-  TPictureQueue = TThreadedQueue<TPicture>;
-
-  TPictureReader = class(TThread)
-  private
-    Queue: TPictureQueue;
+  TViewList = class(TObjectList<TView>)
   protected
-    procedure Execute; override;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure DoShutDown;
-    procedure Push(Picture: TPicture);
-  end;
-
-  TPictureList = class(TObjectList<TPicture>)
-  private const
-    PICTURES_MARGIN = 10;
-  private
-    FFeedMode: Boolean;
+    FViewMode: TViewMode;
     FSize: TPointF;
-    Cache: TList<TPicture>;
-    PictureReader: TPictureReader;
-    procedure AddPicture(const PictureFileName: string);
-    procedure ToCache(Picture: TPicture);
-    procedure OnPictureRead(Sender: TObject);
-    procedure OnPicturePaint(Sender: TObject; Canvas: TCanvas; const ARect: TRectF);
+    FTick: TTickObject;
+    procedure OnTickProcess(Sender: TObject);
   public
-    constructor Create;
+    constructor Create; virtual;
     destructor Destroy; override;
-    procedure ReadDirectory(const Directory: string);
-    function PictureOf(PictureIndex: Integer): TPicture;
-    function AtPoint(const Point: TPointF): TPicture;
+    function ViewOf(ViewIndex: Integer): TView;
+    function AtPoint(const Point: TPointF): TView;
     function IndexAtPoint(const Point: TPointF): Integer;
-    procedure Placement(FeedMode: Boolean; const PaddingRect: TRectF; const PageSize: TPointF);
-    property FeedMode: Boolean read FFeedMode;
-    property Size: TPointF read FSize;
+    procedure Placement(const PaddingRect: TRectF; const PageSize,ViewSize: TPointF); virtual; abstract;
+    procedure Save;
+    procedure Apply(Animated: Boolean);
+    property ViewMode: TViewMode read FViewMode write FViewMode;
+    property Size: TPointF read FSize write FSize;
   end;
-
+
 implementation
 
-{ TPicture }
+{ TView }
 
-constructor TPicture.Create(AOwner: TComponent);
+constructor TView.Create(AOwner: TComponent);
 begin
   inherited;
 
@@ -97,160 +84,95 @@ begin
 
 end;
 
-destructor TPicture.Destroy;
+destructor TView.Destroy;
 begin
   inherited;
 end;
 
-procedure TPicture.AfterPaint;
+procedure TView.AfterPaint;
 begin
   inherited;
   if Empty and Assigned(FOnRead) then FOnRead(Self);
 end;
 
-function TPicture.ToString: string;
+function TView.ToString: string;
 begin
-  Result:=PictureFilename+' ('+
-    Fill.Bitmap.Bitmap.Width.ToString+' x '+
-    Fill.Bitmap.Bitmap.Height.ToString+')';
+  Result:='View '+ViewIndex.ToString;
 end;
 
-function TPicture.Empty: Boolean;
+function TView.Empty: Boolean;
 begin
   Result:=State=StateEmpty;
 end;
 
-function TPicture.Loaded: Boolean;
+function TView.Loaded: Boolean;
 begin
   Result:=State=StateLoaded;
 end;
 
-procedure TPicture.Loading;
+procedure TView.Loading;
 begin
   State:=StateLoading;
 end;
 
-procedure TPicture.SetBitmap(B: TBitmap);
+procedure TView.Animate(Time: Single);
+var R: TRectF;
 begin
 
-  TThread.Synchronize(nil,procedure
-  begin
+  R.Left:=InterpolateSingle(StartBounds.Left,ViewBounds.Left,Time);
+  R.Top:=InterpolateSingle(StartBounds.Top,ViewBounds.Top,Time);
+  R.Right:=InterpolateSingle(StartBounds.Right,ViewBounds.Right,Time);
+  R.Bottom:=InterpolateSingle(StartBounds.Bottom,ViewBounds.Bottom,Time);
 
-    BeginUpdate;
-
-    Opacity:=0;
-
-    Fill.Bitmap.Bitmap:=B;
-    Fill.Kind:=TBrushKind.Bitmap;
-
-    State:=StateLoaded;
-
-    TAnimator.AnimateFloat(Self,'Opacity',0.8);
-
-    EndUpdate;
-
-  end);
+  BoundsRect:=R;
 
 end;
 
-procedure TPicture.ReleaseBitmap;
-begin
+{ TViewList }
 
-  BeginUpdate;
-
-  Fill.Kind:=TBrushKind.None;
-  Fill.Bitmap.Bitmap:=nil;
-
-  State:=StateEmpty;
-
-  EndUpdate;
-
-end;
-
-{ TPictureReader }
-
-constructor TPictureReader.Create;
-begin
-  Queue:=TPictureQueue.Create;
-  inherited Create(True);
-  FreeOnTerminate:=True;
-end;
-
-destructor TPictureReader.Destroy;
-begin
-  Queue.Free;
-end;
-
-procedure TPictureReader.DoShutDown;
-begin
-  Queue.DoShutDown;
-end;
-
-procedure TPictureReader.Push(Picture: TPicture);
-begin
-  if Assigned(Picture) and Picture.Empty then
-  begin
-    Picture.Loading;
-    Queue.PushItem(Picture);
-  end;
-end;
-
-procedure TPictureReader.Execute;
-begin
-
-  while not Terminated do
-  begin
-
-    var Picture:=Queue.PopItem;
-
-    if Queue.ShutDown then Break;
-
-    var B:=TBitmap.CreateFromFile(Picture.PictureFileName);
-
-    Picture.SetBitmap(B);
-
-    B.Free;
-
-  end;
-
-end;
-
-{ TPictureList }
-
-constructor TPictureList.Create;
+constructor TViewList.Create;
 begin
   inherited Create(True);
-  Cache:=TList<TPicture>.Create;
-  PictureReader:=TPictureReader.Create;
-  PictureReader.Start;
+
+  FTick:=TTickObject.Create(True);
+  FTick.Duration:=1;//2.5;
+  FTick.OnProcess:=OnTickProcess;
+  FTick.StopOnEvent:=True;
+
 end;
 
-destructor TPictureList.Destroy;
+destructor TViewList.Destroy;
 begin
-  PictureReader.DoShutDown;
-  Cache.Free;
+  FTick.Free;
   inherited;
 end;
 
-function TPictureList.PictureOf(PictureIndex: Integer): TPicture;
+procedure TViewList.OnTickProcess(Sender: TObject);
+var Time: Single;
+begin
+  Time:=InterpolateLinear(Ftick.Time,0,1,FTick.Duration);
+  for var View in Self do View.Animate(Time);
+end;
+
+function TViewList.ViewOf(ViewIndex: Integer): TView;
 begin
-  if InRange(PictureIndex,0,Count-1) then
-    Result:=Items[PictureIndex]
+  if InRange(ViewIndex,0,Count-1) then
+    Result:=Items[ViewIndex]
   else
     Result:=nil;
 end;
 
-function TPictureList.AtPoint(const Point: TPointF): TPicture;
+function TViewList.AtPoint(const Point: TPointF): TView;
 begin
 
   Result:=nil;
 
-  for var Picture in Self do
-  if Picture.BoundsRect.Contains(Point) then Exit(Picture);
+  for var View in Self do
+  if View.BoundsRect.Contains(Point) then Exit(View);
 
 end;
 
-function DistanceRect(const R: TRectF; const P: TPointF): Single;
+function DistanceToRect(const R: TRectF; const P: TPointF): Single;
 begin
   if R.Contains(P) then
     Result:=0
@@ -258,7 +180,7 @@ begin
     Result:=R.CenterPoint.Distance(P)-R.Width/2;
 end;
 
-function TPictureList.IndexAtPoint(const Point: TPointF): Integer;
+function TViewList.IndexAtPoint(const Point: TPointF): Integer;
 var D,Distance: Single;
 begin
 
@@ -266,124 +188,54 @@ begin
 
   for var I:=0 to Count-1 do
   begin
-    Distance:=DistanceRect(Items[I].BoundsRect,Point);
-    if (I=0) or (Distance<D) then Result:=I;
-    D:=Distance;
-  end;
 
-end;
+    Distance:=DistanceToRect(Items[I].BoundsRect,Point);
 
-procedure TPictureList.Placement(FeedMode: Boolean; const PaddingRect: TRectF; const PageSize: TPointF);
-var PageRect,PageBounds,PictureRect: TRectF;
-begin
+    if Distance=0 then
+      Exit(I)
+    else
 
-  FFeedMode:=FeedMode;
-
-  PageRect:=TRectF.Create(PaddingRect.TopLeft,PageSize.X,PageSize.Y-
-    PaddingRect.Top-PaddingRect.Bottom);
-
-  for var Picture in Self do
-  begin
-
-    PictureRect:=RectF(0,0,Picture.BitmapSize.X,Picture.BitmapSize.Y).
-      PlaceInto(PageRect,THorzRectAlign.Center,TVertRectAlign.Center);
-
-    if FeedMode then
+    if (I=0) or (Distance<D) then
     begin
-      PictureRect.SetLocation(PageRect.Left,PictureRect.Top);
-      PageBounds:=PageRect.CenterAt(PictureRect);
-      PageRect.SetLocation(PictureRect.Right+PICTURES_MARGIN,PageRect.Top);
-    end else begin
-      PageBounds:=PageRect;
-      PageRect.Offset(PageRect.Width+PICTURES_MARGIN,0)
+      Result:=I;
+      D:=Distance;
     end;
 
-    Picture.BoundsRect:=PictureRect.SnapToPixel(0);
-    Picture.PageBounds:=PageBounds;
-
-  end;
-
-  FSize:=PointF(PageRect.Left-PICTURES_MARGIN,PageRect.Bottom)+PaddingRect.BottomRight;
-
-end;
-
-procedure TPictureList.ToCache(Picture: TPicture);
-begin
-
-  if (Picture=nil) or ((Cache.Count>0) and (Cache.Last=Picture)) then Exit;
-
-  Cache.Remove(Picture);
-  Cache.Add(Picture);
-
-  while (Cache.Count>20) and Cache[0].Loaded do
-  begin
-    Cache[0].ReleaseBitmap;
-    Cache.Delete(0);
   end;
 
 end;
 
-function ReadImageSize(const PictureFileName: string; out ImageSize: TPointF): Boolean;
+function ToAbsoluteRect(const R: TRectF; Control: TControl): TRectF;
 begin
-
-  ImageSize:=TBitmapCodecManager.GetImageSize(PictureFileName);
-
-  Result:=(ImageSize.X>0) and (ImageSize.Y>0); // is valid picture file
-
+  Result.Topleft:=Control.LocalToAbsolute(R.TopLeft);
+  Result.BottomRight:=Control.LocalToAbsolute(R.BottomRight);
 end;
 
-procedure TPictureList.AddPicture(const PictureFileName: string);
-var
-  P: TPicture;
-  ImageSize: TPointF;
+function ToLocalRect(const R: TRectF; Control: TControl): TRectF;
+begin
+  Result.TopLeft:=Control.AbsoluteToLocal(R.TopLeft);
+  Result.BottomRight:=Control.AbsoluteToLocal(R.BottomRight);
+end;
+
+procedure TViewList.Save;
+begin
+  for var View in Self do
+  View.StartBounds:=ToAbsoluteRect(View.BoundsRect,View.ParentControl);
+end;
+
+procedure TViewList.Apply(Animated: Boolean);
 begin
 
-  if ReadImageSize(PictureFileName,ImageSize) then
+  if Animated then
   begin
 
-    P:=TPicture.Create(nil);
+    for var View in Self do View.StartBounds:=ToLocalRect(View.StartBounds,View.ParentControl);
 
-    P.BitmapSize:=ImageSize;
-    P.PictureIndex:=Count;
-    P.PictureFileName:=PictureFileName;
-    //P.OnRead:=OnPictureRead;
-    P.OnPaint:=OnPicturePaint;
+    FTick.Restart(True);
 
-    Add(P);
+  end else
 
-  end;
-
-end;
-
-procedure TPictureList.ReadDirectory(const Directory: string);
-begin
-  for var F in GetFiles(Directory,False) do AddPicture(F);
-end;
-
-procedure TPictureList.OnPictureRead(Sender: TObject);
-begin
-
-  var Picture:=TPicture(Sender);
-
-  //PictureReader.Push(PictureOf(Picture.PictureIndex-1));
-  PictureReader.Push(Picture);
-  //PictureReader.Push(PictureOf(Picture.PictureIndex+1));
-
-  ToCache(Picture);
-
-end;
-
-procedure TPictureList.OnPicturePaint(Sender: TObject; Canvas: TCanvas; const ARect: TRectF);
-var R: TRectF;
-begin
-
-  var Picture:=TPicture(Sender);
-
-  PictureReader.Push(Picture);
-  //PictureReader.Push(PictureOf(Picture.PictureIndex-1));
-  //PictureReader.Push(PictureOf(Picture.PictureIndex+1));
-
-  ToCache(Picture);
+    for var View in Self do View.BoundsRect:=View.ViewBounds;
 
 end;
 

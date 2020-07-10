@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'Form1'
-  ClientHeight = 420
-  ClientWidth = 1111
+  ClientHeight = 648
+  ClientWidth = 416
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -14,8 +14,8 @@ object MainForm: TMainForm
     Touch.InteractiveGestures = [Pan]
     OnGesture = Rectangle2Gesture
     Align = Contents
-    Size.Width = 1111.000000000000000000
-    Size.Height = 420.000000000000000000
+    Size.Width = 416.000000000000000000
+    Size.Height = 648.000000000000000000
     Size.PlatformDefault = False
     Stroke.Kind = None
     Stroke.Thickness = 0.000000000000000000
@@ -43,17 +43,19 @@ object MainForm: TMainForm
     end
   end
   object Rectangle1: TRectangle
-    Align = MostRight
+    Anchors = [akTop, akRight, akBottom]
     ClipChildren = True
     Fill.Kind = None
     Padding.Left = 1.000000000000000000
     Padding.Right = 1.000000000000000000
-    Position.X = 1105.000000000000000000
+    Position.X = 408.000000000000000000
+    Position.Y = 2.000000000000000000
     Size.Width = 6.000000000000000000
-    Size.Height = 414.000000000000000000
+    Size.Height = 644.000000000000000000
     Size.PlatformDefault = False
     Stroke.Kind = None
     Stroke.Thickness = 0.000000000000000000
+    OnPainting = Rectangle5Painting
     object Rectangle4: TRectangle
       Align = Horizontal
       Fill.Color = xFF757575
@@ -69,23 +71,25 @@ object MainForm: TMainForm
     end
   end
   object Rectangle5: TRectangle
-    Align = MostBottom
+    Anchors = [akLeft, akRight, akBottom]
     ClipChildren = True
     Fill.Kind = None
     Padding.Top = 1.000000000000000000
     Padding.Bottom = 1.000000000000000000
-    Position.Y = 414.000000000000000000
-    Size.Width = 1111.000000000000000000
+    Position.X = 2.000000000000000000
+    Position.Y = 640.000000000000000000
+    Size.Width = 412.000000000000000000
     Size.Height = 6.000000000000000000
     Size.PlatformDefault = False
     Stroke.Kind = None
     Stroke.Thickness = 0.000000000000000000
+    OnPainting = Rectangle5Painting
     object Rectangle6: TRectangle
       Align = Vertical
       Fill.Color = xFF757575
       Position.X = 40.000000000000000000
       Position.Y = 1.000000000000000000
-      Size.Width = 497.000000000000000000
+      Size.Width = 291.000000000000000000
       Size.Height = 4.000000000000000000
       Size.PlatformDefault = False
       Stroke.Kind = None
