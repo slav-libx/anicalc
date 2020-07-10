@@ -28,6 +28,7 @@ type
     procedure AfterPaint; override;
     procedure Animate(Time: Single);
   public
+    Viewport: TPointF;
     StartBounds: TRectF;
     ViewBounds: TRectF;
     PageBounds: TRectF;
@@ -135,7 +136,7 @@ begin
   inherited Create(True);
 
   FTick:=TTickObject.Create(True);
-  FTick.Duration:=1;//2.5;
+  FTick.Duration:=0.5;//2.5;
   FTick.OnProcess:=OnTickProcess;
   FTick.StopOnEvent:=True;
 

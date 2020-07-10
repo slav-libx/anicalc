@@ -165,13 +165,18 @@ begin
 
   ScrollContent.Size.Size:=Views.Size;
 
-  ScrollContent.EndUpdate;
-
   DoUpdateScrollingLimits;
+
+  ScrollContent.EndUpdate;
 
   ScrollToView(CurrentView,True);
 
+//  if CurrentView<>nil then
+//    ScrollContent.Position.Point:=-CurrentView.Viewport;
+
   AniCalcChange(nil);
+
+  //ScrollToView(CurrentView,True);
 
   Views.Apply(FAnimated);
 
@@ -225,12 +230,12 @@ begin
   CurrentView:=View;
 
   A.TargetType:=TAniCalculations.TTargetType.Other;
-  A.Point:=View.PageBounds.TopLeft;
+  A.Point:=View.Viewport;// PageBounds.TopLeft;
 
 //  FAniCalc.Animation:=not Immediately;
 
   if Immediately then
-    FAniCalc.ViewportPositionF:=View.PageBounds.TopLeft
+    FAniCalc.ViewportPositionF:=View.Viewport //View.PageBounds.TopLeft
   else
     TAniCalculationsAccess(FAniCalc).MouseTarget:=A;
 
@@ -278,7 +283,7 @@ begin
       Views.ViewMode:=vmTumbs;
     CurrentView:=View;
     PlacementPictures;
-    ScrollToView(View,True);
+//    ScrollToView(View,True);
     FLeave:=True;
 //    ShowText(View.ToString);
   end;

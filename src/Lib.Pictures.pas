@@ -191,6 +191,12 @@ end;
 
 { TPictureList }
 
+function MaxPoint(const P1,P2: TPointF): TPointF;
+begin
+  Result.X:=Max(P1.X,P2.X);
+  Result.Y:=Max(P1.Y,P2.Y);
+end;
+
 constructor TPictureList.Create;
 begin
   inherited;
@@ -226,6 +232,7 @@ begin
     View.ViewBounds:=ViewRect.SnapToPixel(0);
     View.PageBounds:=PageRect;
     View.PageBounds.Inflate(0,PaddingRect.Top,0,PaddingRect.Bottom);
+    View.Viewport:=MaxPoint(View.PageBounds.TopLeft,TPointF.Zero);
 
     FSize.X:=Max(FSize.X,PageRect.Right);
     FSize.Y:=Max(FSize.Y,PageRect.Bottom);
@@ -264,6 +271,7 @@ begin
     View.ViewBounds:=PictureRect.SnapToPixel(0);
     View.PageBounds:=PageBounds;
     View.PageBounds.Inflate(0,PaddingRect.Top,0,PaddingRect.Bottom);
+    View.Viewport:=MaxPoint(View.PageBounds.TopLeft,TPointF.Zero);
 
     FSize.X:=Max(FSize.X,PageRect.Left);
     FSize.Y:=Max(FSize.Y,PageBounds.Bottom);
@@ -319,6 +327,7 @@ begin
 
     View.ViewBounds:=ShowRect.SnapToPixel(0);
     View.PageBounds:=PageRect.CenterAt(ShowRect);
+    View.Viewport:=MaxPoint(View.PageBounds.TopLeft,TPointF.Zero);
 
     FSize.X:=Max(FSize.X,ShowRect.Right);
     FSize.Y:=Max(FSize.Y,ViewRect.Bottom);

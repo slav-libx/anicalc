@@ -210,6 +210,7 @@ procedure TTickObject.DoStart;
 begin
   FDelayTime:=0;
   FTime:=0;
+  ProcessTick(0);
 end;
 
 procedure TTickObject.DoProcess;
