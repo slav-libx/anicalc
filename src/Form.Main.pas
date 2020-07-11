@@ -171,12 +171,25 @@ begin
 
   ScrollToView(CurrentView,True);
 
+//  if Views.ViewMode=vmTumbs then
+//  FAniCalc.ViewportPositionF:=TPointF.Zero;
+
 //  if CurrentView<>nil then
 //    ScrollContent.Position.Point:=-CurrentView.Viewport;
 
   AniCalcChange(nil);
 
   //ScrollToView(CurrentView,True);
+
+  for var View in Views do View.AnimationType:=atProcess;
+
+//  case Views.ViewMode of
+//  vmSingle: for var View in Views do View.AnimationType:=atStop;
+//  vmFeed: for var View in Views do View.AnimationType:=atProcess;
+//  vmTumbs: for var View in Views do View.AnimationType:=atStart;
+//  end;
+//
+//  if Assigned(CurrentView) then CurrentView.AnimationType:=atProcess;
 
   Views.Apply(FAnimated);
 
@@ -282,6 +295,7 @@ begin
     else
       Views.ViewMode:=vmTumbs;
     CurrentView:=View;
+    CurrentView.BringToFront;
     PlacementPictures;
 //    ScrollToView(View,True);
     FLeave:=True;

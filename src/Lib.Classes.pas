@@ -27,6 +27,8 @@ type
     FOnRead: TNotifyEvent;
     procedure AfterPaint; override;
     procedure Animate(Time: Single);
+  public type
+    TAnimationType = (atProcess,atStart,atStop);
   public
     Viewport: TPointF;
     StartBounds: TRectF;
@@ -35,6 +37,7 @@ type
     SourceSize: TPointF;
     Group: string;
     ViewIndex: Integer;
+    AnimationType: TAnimationType;
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     function Empty: Boolean;
@@ -50,8 +53,9 @@ type
   protected
     FViewMode: TViewMode;
     FSize: TPointF;
-    FTick: TTickObject;
-    procedure OnTickProcess(Sender: TObject);
+    FAnimation: TTickObject;
+    procedure OnAnimationProcess(Sender: TObject);
+    procedure OnAnimationEvent(Sender: TObject);
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -120,6 +124,8 @@ procedure TView.Animate(Time: Single);
 var R: TRectF;
 begin
 
+  if AnimationType<>atProcess then Exit;
+
   R.Left:=InterpolateSingle(StartBounds.Left,ViewBounds.Left,Time);
   R.Top:=InterpolateSingle(StartBounds.Top,ViewBounds.Top,Time);
   R.Right:=InterpolateSingle(StartBounds.Right,ViewBounds.Right,Time);
@@ -135,25 +141,31 @@ constructor TViewList.Create;
 begin
   inherited Create(True);
 
-  FTick:=TTickObject.Create(True);
-  FTick.Duration:=0.5;//2.5;
-  FTick.OnProcess:=OnTickProcess;
-  FTick.StopOnEvent:=True;
+  FAnimation:=TTickObject.Create(True);
+  FAnimation.Duration:=0.2;//2.5;
+  FAnimation.OnProcess:=OnAnimationProcess;
+  FAnimation.OnEvent:=OnAnimationEvent;
+  FAnimation.StopOnEvent:=True;
 
 end;
 
 destructor TViewList.Destroy;
 begin
-  FTick.Free;
+  FAnimation.Free;
   inherited;
 end;
 
-procedure TViewList.OnTickProcess(Sender: TObject);
+procedure TViewList.OnAnimationProcess(Sender: TObject);
 var Time: Single;
 begin
-  Time:=InterpolateLinear(Ftick.Time,0,1,FTick.Duration);
+  Time:=InterpolateLinear(FAnimation.Time,0,1,FAnimation.Duration);
   for var View in Self do View.Animate(Time);
 end;
+
+procedure TViewList.OnAnimationEvent(Sender: TObject);
+begin
+  for var View in Self do View.BoundsRect:=View.ViewBounds;
+end;
 
 function TViewList.ViewOf(ViewIndex: Integer): TView;
 begin
@@ -232,7 +244,10 @@ begin
 
     for var View in Self do View.StartBounds:=ToLocalRect(View.StartBounds,View.ParentControl);
 
-    FTick.Restart(True);
+    for var View in Self do if View.AnimationType=atStart then
+      View.BoundsRect:=View.ViewBounds;
+
+    FAnimation.Restart(True);
 
   end else
 

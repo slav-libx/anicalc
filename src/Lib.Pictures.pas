@@ -327,7 +327,7 @@ begin
 
     View.ViewBounds:=ShowRect.SnapToPixel(0);
     View.PageBounds:=PageRect.CenterAt(ShowRect);
-    View.Viewport:=MaxPoint(View.PageBounds.TopLeft,TPointF.Zero);
+    View.Viewport:=PointF(0,Max(0,View.PageBounds.Top));
 
     FSize.X:=Max(FSize.X,ShowRect.Right);
     FSize.Y:=Max(FSize.Y,ViewRect.Bottom);
