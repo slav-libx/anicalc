@@ -12,7 +12,6 @@ uses
   System.Math,
   System.IOUtils,
   FMX.Types,
-  FMX.Ani,
   FMX.Graphics,
   FMX.Objects,
   Lib.Log,
@@ -91,7 +90,7 @@ begin
 
     State:=StateLoaded;
 
-    TAnimator.AnimateFloat(Self,'Opacity',0.8);
+    ShowAnimated;
 
     EndUpdate;
 
@@ -338,6 +337,10 @@ begin
 
   FSize:=FSize+PaddingRect.BottomRight;
 
+  for var View in Self do
+  if View is TPicture then
+    View.Viewport.Y:=Min(View.Viewport.Y,FSize.Y-PageSize.Y);
+
 end;
 
 procedure TPictureList.Placement(const PaddingRect: TRectF; const PageSize,ViewSize: TPointF);
@@ -364,7 +367,7 @@ begin
   if ViewMode=vmTumbs then
     CacheSize:=100
   else
-    CacheSize:=20;
+    CacheSize:=100;//20;
 
   Cache.Remove(Picture);
   Cache.Add(Picture);

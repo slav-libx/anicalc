@@ -60,7 +60,6 @@ type
     Views: TPictureList;
     CurrentView: TView;
     FLeave: Boolean;
-    FAnimated: Boolean;
     FDownPoint: TPointF;
     FScrollType: (stNone,stHScroll,stVScroll,stBoth);
     procedure AniCalcChange(Sender: TObject);
@@ -74,7 +73,7 @@ type
     function TryViewAtPoint(const AbsolutePoint: TPointF; out View: TView): Boolean;
     function ViewIndexAt(const AbsolutePoint: TPointF): Integer;
     procedure ShowText(const Text: string);
-    procedure PlacementPictures;
+    procedure PlacementPictures(Animated: Boolean);
     procedure ScrollToView(View: TView; Immediately: Boolean=False); overload;
     procedure ScrollToView(ViewIndex: Integer; Immediately: Boolean=False); overload;
     function GetScrollPoint(X,Y: Single): TPointF;
@@ -116,8 +115,6 @@ begin
 //  TAniCalculationsAccess(FAniCalc).StorageTime:=0.1;//1000;
   TAniCalculationsAccess(FAniCalc).DeadZone:=10; // смещение после которого происходит инициация анимации, работает только если Averaging=True
 
-  FAnimated:=False;
-
   Views:=TPictureList.Create;
 
   Views.ViewMode:=vmTumbs;
@@ -136,7 +133,7 @@ begin
   FAniCalc.Free;
 end;
 
-procedure TMainForm.PlacementPictures;
+procedure TMainForm.PlacementPictures(Animated: Boolean);
 var PageSize,ViewSize: TPointF;
 begin
 
@@ -151,13 +148,13 @@ begin
   PageSize:=Rectangle2.BoundsRect.BottomRight;
 
   if Views.ViewMode=vmTumbs then
-    ViewSize:=PointF(PageSize.X-ScrollContent.Padding.Rect.Left-ScrollContent.Padding.Rect.Right,150)
+    ViewSize:=PointF(PageSize.X-ScrollContent.Padding.Rect.Left-ScrollContent.Padding.Rect.Right,Round(PageSize.Y/5))
   else
     ViewSize:=PageSize;
 
   ScrollContent.BeginUpdate;
 
-  if FAnimated then Views.Save;
+  if Animated then Views.Save;
 
   Views.Placement(ScrollContent.Padding.Rect,PageSize,ViewSize);
 
@@ -171,29 +168,17 @@ begin
 
   ScrollToView(CurrentView,True);
 
-//  if Views.ViewMode=vmTumbs then
-//  FAniCalc.ViewportPositionF:=TPointF.Zero;
-
-//  if CurrentView<>nil then
-//    ScrollContent.Position.Point:=-CurrentView.Viewport;
-
   AniCalcChange(nil);
 
-  //ScrollToView(CurrentView,True);
+  case Views.ViewMode of
+  vmSingle: for var View in Views do View.AnimationType:=atStop;
+  vmFeed: Animated:=False;
+  vmTumbs: for var View in Views do View.AnimationType:=atStart;
+  end;
 
-  for var View in Views do View.AnimationType:=atProcess;
+  if Assigned(CurrentView) then CurrentView.AnimationType:=atProcess;
 
-//  case Views.ViewMode of
-//  vmSingle: for var View in Views do View.AnimationType:=atStop;
-//  vmFeed: for var View in Views do View.AnimationType:=atProcess;
-//  vmTumbs: for var View in Views do View.AnimationType:=atStart;
-//  end;
-//
-//  if Assigned(CurrentView) then CurrentView.AnimationType:=atProcess;
-
-  Views.Apply(FAnimated);
-
-  FAnimated:=True;
+  Views.Apply(Animated);
 
 end;
 
@@ -243,18 +228,12 @@ begin
   CurrentView:=View;
 
   A.TargetType:=TAniCalculations.TTargetType.Other;
-  A.Point:=View.Viewport;// PageBounds.TopLeft;
-
-//  FAniCalc.Animation:=not Immediately;
+  A.Point:=View.Viewport;
 
   if Immediately then
-    FAniCalc.ViewportPositionF:=View.Viewport //View.PageBounds.TopLeft
+    FAniCalc.ViewportPosition:=A.Point
   else
     TAniCalculationsAccess(FAniCalc).MouseTarget:=A;
-
-//  if Immediately then FAniCalc.UpdatePosImmediately(True);
-
-//  FAniCalc.Animation:=True;
 
 end;
 
@@ -271,8 +250,7 @@ end;
 
 procedure TMainForm.Rectangle2Resized(Sender: TObject);
 begin
-  PlacementPictures;
-  ScrollToView(CurrentView,True);
+  PlacementPictures(False);
 end;
 
 procedure TMainForm.Rectangle5Painting(Sender: TObject; Canvas: TCanvas;
@@ -296,10 +274,8 @@ begin
       Views.ViewMode:=vmTumbs;
     CurrentView:=View;
     CurrentView.BringToFront;
-    PlacementPictures;
-//    ScrollToView(View,True);
+    PlacementPictures(True);
     FLeave:=True;
-//    ShowText(View.ToString);
   end;
 end;
 
@@ -325,25 +301,21 @@ begin
 
   Result:=PointF(X,Y);
 
-  if Views.ViewMode=vmTumbs then
-    FScrollType:=stVScroll
-  else
-  if Views.ViewMode=vmFeed then
-    FScrollType:=stHScroll
-  else
+  case Views.ViewMode of
+
+  vmTumbs:
+    FScrollType:=stVScroll;
+
+  vmFeed:
+    FScrollType:=stHScroll;
+
+  end;
+
   if FScrollType=stNone then
   if Abs(FDownPoint.Y-Y)>Abs(FDownPoint.X-X) then
     FScrollType:=stVScroll
   else
     FScrollType:=stHScroll;
-
-//  if FScrollType in [stNone,stHScroll] then
-//  if Abs(FDownPoint.Y-Y)>10 then
-//  begin
-//    FScrollType:=stVScroll;
-//    FDownPoint.X:=X;
-//  end else
-//    FScrollType:=stHScroll;
 
   case FScrollType of
   stHScroll: Result.Y:=FDownPoint.Y;

@@ -23,10 +23,15 @@ type
   TView = class(TRectangle)
   protected
     State: (StateEmpty,StateLoading,StateLoaded);
+//  private
+//    FAnimating: Boolean;
   protected
     FOnRead: TNotifyEvent;
     procedure AfterPaint; override;
     procedure Animate(Time: Single);
+    procedure StartAnimation;
+    procedure StopAnimation;
+    procedure ShowAnimated;
   public type
     TAnimationType = (atProcess,atStart,atStop);
   public
@@ -71,6 +76,9 @@ type
 
 implementation
 
+const
+  VIEW_OPACITY = 0.8;
+
 { TView }
 
 constructor TView.Create(AOwner: TComponent);
@@ -85,7 +93,7 @@ begin
   Stroke.Thickness:=0;
 
   HitTest:=False;
-  Opacity:=0.8;
+  Opacity:=VIEW_OPACITY;
 
 end;
 
@@ -120,19 +128,51 @@ begin
   State:=StateLoading;
 end;
 
+function InterpolateRect(const StartRect,StopRect: TRectF; Time: Single): TRectF;
+begin
+  Result.Left:=InterpolateSingle(StartRect.Left,StopRect.Left,Time);
+  Result.Top:=InterpolateSingle(StartRect.Top,StopRect.Top,Time);
+  Result.Right:=InterpolateSingle(StartRect.Right,StopRect.Right,Time);
+  Result.Bottom:=InterpolateSingle(StartRect.Bottom,StopRect.Bottom,Time);
+end;
+
+function Animating(Target: TFmxObject): Boolean;
+begin
+  for var I:=0 to Target.ChildrenCount-1 do
+  if Target.Children[I] is TCustomPropertyAnimation then Exit(True);
+  Result:=False;
+end;
+
+procedure TView.StartAnimation;
+begin
+  case AnimationType of
+  atStart: BoundsRect:=ViewBounds;
+  atStop: BoundsRect:=StartBounds;
+  end;
+end;
+
+procedure TView.StopAnimation;
+begin
+  BoundsRect:=ViewBounds;
+  if Loaded and not Animating(Self) then Opacity:=VIEW_OPACITY;
+end;
+
 procedure TView.Animate(Time: Single);
-var R: TRectF;
 begin
 
-  if AnimationType<>atProcess then Exit;
+  case AnimationType of
+  atProcess:
+    BoundsRect:=InterpolateRect(StartBounds,ViewBounds,Time);
+  atStop:
+    if Loaded and not Animating(Self) then
+      Opacity:=InterpolateSingle(VIEW_OPACITY,0,Time);
+  end;
 
-  R.Left:=InterpolateSingle(StartBounds.Left,ViewBounds.Left,Time);
-  R.Top:=InterpolateSingle(StartBounds.Top,ViewBounds.Top,Time);
-  R.Right:=InterpolateSingle(StartBounds.Right,ViewBounds.Right,Time);
-  R.Bottom:=InterpolateSingle(StartBounds.Bottom,ViewBounds.Bottom,Time);
+end;
 
-  BoundsRect:=R;
-
+procedure TView.ShowAnimated;
+begin
+  TAnimator.AnimateFloat(Self,'Opacity',VIEW_OPACITY);
 end;
 
 { TViewList }
@@ -164,7 +204,7 @@ var Time: Single;
 
 procedure TViewList.OnAnimationEvent(Sender: TObject);
 begin
-  for var View in Self do View.BoundsRect:=View.ViewBounds;
+  for var View in Self do View.StopAnimation;
 end;
 
 function TViewList.ViewOf(ViewIndex: Integer): TView;
@@ -242,16 +282,17 @@ begin
   if Animated then
   begin
 
-    for var View in Self do View.StartBounds:=ToLocalRect(View.StartBounds,View.ParentControl);
-
-    for var View in Self do if View.AnimationType=atStart then
-      View.BoundsRect:=View.ViewBounds;
+    for var View in Self do
+    begin
+      View.StartBounds:=ToLocalRect(View.StartBounds,View.ParentControl);
+      View.StartAnimation;
+    end;
 
     FAnimation.Restart(True);
 
   end else
 
-    for var View in Self do View.BoundsRect:=View.ViewBounds;
+    for var View in Self do View.StopAnimation;
 
 end;
 
