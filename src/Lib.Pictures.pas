@@ -281,6 +281,10 @@ begin
 
   FSize:=FSize+PaddingRect.BottomRight;
 
+  for var View in Self do
+  if View is TPicture then
+    View.Viewport.X:=Min(View.Viewport.X,FSize.X-PageSize.X);
+
 end;
 
 procedure TPictureList.PlacementTumbs(const PaddingRect: TRectF; const PageSize,ViewSize: TPointF);

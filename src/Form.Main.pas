@@ -59,6 +59,8 @@ type
     ContentSize: TPointF;
     Views: TPictureList;
     CurrentView: TView;
+    TumbsView: TView;
+    TumbsViewport: TPointF;
     FLeave: Boolean;
     FDownPoint: TPointF;
     FScrollType: (stNone,stHScroll,stVScroll,stBoth);
@@ -119,6 +121,9 @@ begin
 
   Views.ViewMode:=vmTumbs;
 
+  TumbsView:=CurrentView;
+  TumbsViewport:=FAniCalc.ViewportPositionF;
+
   RequestPermissionsExternalStorage(
   procedure(Granted: Boolean)
   begin
@@ -166,7 +171,11 @@ begin
 
   ScrollContent.EndUpdate;
 
-  ScrollToView(CurrentView,True);
+  if (Views.ViewMode=vmTumbs) and (TumbsView=CurrentView) then
+    FAniCalc.ViewportPositionF:=TumbsViewport
+  else
+  if Assigned(CurrentView) then
+    FAniCalc.ViewportPositionF:=CurrentView.Viewport;
 
   AniCalcChange(nil);
 
@@ -250,6 +259,7 @@ end;
 
 procedure TMainForm.Rectangle2Resized(Sender: TObject);
 begin
+  TumbsView:=nil;
   PlacementPictures(False);
 end;
 
@@ -264,19 +274,32 @@ end;
 procedure TMainForm.Rectangle2Click(Sender: TObject);
 var View: TView;
 begin
+
   if not FAniCalc.Moved then
   //if FScrollType=stNone then
   if TryViewAtPoint(AbsolutePressedPoint,View) then
   begin
+
+    CurrentView:=View;
+    CurrentView.BringToFront;
+
+    if Views.ViewMode=vmTumbs then
+    begin
+      TumbsView:=CurrentView;
+      TumbsViewport:=FAniCalc.ViewportPositionF;
+    end;
+
     if Views.ViewMode=vmTumbs then
       Views.ViewMode:=vmSingle
     else
       Views.ViewMode:=vmTumbs;
-    CurrentView:=View;
-    CurrentView.BringToFront;
+
     PlacementPictures(True);
+
     FLeave:=True;
+
   end;
+
 end;
 
 procedure TMainForm.Rectangle2Gesture(Sender: TObject;
