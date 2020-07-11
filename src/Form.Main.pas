@@ -415,6 +415,7 @@ procedure TMainForm.Rectangle2MouseUp(Sender: TObject; Button: TMouseButton;
 var
   P: TPointF;
   ViewIndex: Integer;
+  Velocity: TPointD;
 begin
 
   if FAniCalc <> nil then
@@ -428,13 +429,20 @@ begin
     if Views.ViewMode=vmSingle then
     begin
 
-      if (Abs(FAniCalc.CurrentVelocity.X)<100) and (Abs(FAniCalc.CurrentVelocity.Y)<100) then
+      Velocity:=FAniCalc.CurrentVelocity;
+
+      case FScrollType of
+      stHScroll: Velocity.Y:=0;
+      stVScroll: Velocity.X:=0;
+      end;
+
+      if (Abs(Velocity.X)<100) and (Abs(Velocity.Y)<100) then
         ViewIndex:=ViewIndexAt(AbsoluteCenterPoint)
       else
-//      if Abs(FAniCalc.CurrentVelocity.X)>2000 then
-//        I:=PictureIndexAt(Rectangle2.LocalToAbsolute(PointF(X+FAniCalc.CurrentVelocity.X/2,Y)))
+//      if Abs(Velocity.X)>2000 then
+//        I:=PictureIndexAt(Rectangle2.LocalToAbsolute(PointF(X+Velocity.X/2,Y)))
 //      else
-      if FAniCalc.CurrentVelocity.X<0 then
+      if Velocity.X<0 then
         ViewIndex:=CurrentView.ViewIndex-1
       else
         ViewIndex:=CurrentView.ViewIndex+1;
