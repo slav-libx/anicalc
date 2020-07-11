@@ -68,6 +68,7 @@ type
     function AtPoint(const Point: TPointF): TView;
     function IndexAtPoint(const Point: TPointF): Integer;
     procedure Placement(const PaddingRect: TRectF; const PageSize,ViewSize: TPointF); virtual; abstract;
+    procedure SetViewsAnimationType(AnimationType: TView.TAnimationType);
     procedure Save;
     procedure Apply(Animated: Boolean);
     property ViewMode: TViewMode read FViewMode write FViewMode;
@@ -294,6 +295,11 @@ begin
 
     for var View in Self do View.StopAnimation;
 
+end;
+
+procedure TViewList.SetViewsAnimationType(AnimationType: TView.TAnimationType);
+begin
+  for var View in Self do View.AnimationType:=AnimationType;
 end;
 
 end.

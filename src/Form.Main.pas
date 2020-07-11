@@ -180,9 +180,9 @@ begin
   AniCalcChange(nil);
 
   case Views.ViewMode of
-  vmSingle: for var View in Views do View.AnimationType:=atStop;
+  vmSingle: Views.SetViewsAnimationType(atStop);
   vmFeed: Animated:=False;
-  vmTumbs: for var View in Views do View.AnimationType:=atStart;
+  vmTumbs: Views.SetViewsAnimationType(atStart);
   end;
 
   if Assigned(CurrentView) then CurrentView.AnimationType:=atProcess;
