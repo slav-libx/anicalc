@@ -153,7 +153,7 @@ begin
   PageSize:=Rectangle2.BoundsRect.BottomRight;
 
   if Views.ViewMode=vmTumbs then
-    ViewSize:=PointF(PageSize.X-ScrollContent.Padding.Rect.Left-ScrollContent.Padding.Rect.Right,Round(PageSize.Y/5))
+    ViewSize:=PointF(PageSize.X-ScrollContent.Padding.Rect.Left-ScrollContent.Padding.Rect.Right,Round(Max(PageSize.Y,PageSize.X)/5))
   else
     ViewSize:=PageSize;
 
