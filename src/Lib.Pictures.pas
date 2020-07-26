@@ -86,9 +86,10 @@ begin
     Opacity:=0;
 
     Fill.Bitmap.Bitmap:=B;
-    Fill.Kind:=TBrushKind.Bitmap;
 
     State:=StateLoaded;
+
+    Fill.Kind:=TBrushKind.Bitmap;
 
     ShowAnimated;
 
@@ -138,7 +139,7 @@ end;
 
 constructor TPictureReader.Create;
 begin
-  Queue:=TPictureQueue.Create(100);
+  Queue:=TPictureQueue.Create(1000);
   inherited Create(True);
   FreeOnTerminate:=True;
 end;
@@ -408,8 +409,8 @@ begin
     P.ViewIndex:=Count;
     P.PictureFileName:=PictureFileName;
     P.Group:=System.IOUtils.TPath.GetDirectoryName(PictureFileName);
-    //P.OnRead:=OnPictureRead;
-    P.OnPaint:=OnPicturePaint;
+    P.OnRead:=OnPictureRead;
+    //P.OnPaint:=OnPicturePaint;
 
     Add(P);
 
@@ -436,7 +437,6 @@ begin
 end;
 
 procedure TPictureList.OnPicturePaint(Sender: TObject; Canvas: TCanvas; const ARect: TRectF);
-var R: TRectF;
 begin
 
   var Picture:=TPicture(Sender);

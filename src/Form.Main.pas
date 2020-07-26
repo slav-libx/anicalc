@@ -54,8 +54,10 @@ type
     PhysicsProcessingInterval = 8; // 8 ms for ~120 frames per second
     HasPhysicsStretchyScrolling = True;
     PICTURES_MARGIN = 10;
+  private type
+    TAniScroll = class(TAniCalculations);
   private
-    FAniCalc: TAniCalculations;
+    FAniCalc: TAniScroll;
     ContentSize: TPointF;
     Views: TPictureList;
     CurrentView: TView;
@@ -73,7 +75,7 @@ type
     function AbsolutePressedPoint: TPointF;
     function ViewAtPoint(const AbsolutePoint: TPointF): TView;
     function TryViewAtPoint(const AbsolutePoint: TPointF; out View: TView): Boolean;
-    function ViewIndexAt(const AbsolutePoint: TPointF): Integer;
+    function ViewIndexAtPoint(const AbsolutePoint: TPointF): Integer;
     procedure ShowText(const Text: string);
     procedure PlacementPictures(Animated: Boolean);
     procedure ScrollToView(View: TView; Immediately: Boolean=False); overload;
@@ -89,9 +91,6 @@ implementation
 
 {$R *.fmx}
 
-type
-  TAniCalculationsAccess = class(TAniCalculations);
-
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
 
@@ -99,7 +98,7 @@ begin
   InitLog(System.IOUtils.TPath.GetLibraryPath);
   {$ENDIF}
 
-  FAniCalc:=TAniCalculations.Create(nil);
+  FAniCalc:=TAniScroll.Create(nil);
 
   FAniCalc.TouchTracking:=[ttVertical,ttHorizontal];
   FAniCalc.Animation:=True;
@@ -113,9 +112,9 @@ begin
   FAniCalc.Averaging:=True;
 
   FAniCalc.AutoShowing:=True;
-  TAniCalculationsAccess(FAniCalc).Shown:=False;
+  FAniCalc.Shown:=False;
 //  TAniCalculationsAccess(FAniCalc).StorageTime:=0.1;//1000;
-  TAniCalculationsAccess(FAniCalc).DeadZone:=10; // смещение после которого происходит инициация анимации, работает только если Averaging=True
+  FAniCalc.DeadZone:=10; // смещение после которого происходит инициация анимации, работает только для жестов (не для мыши) если Averaging=True
 
   Views:=TPictureList.Create;
 
@@ -181,7 +180,7 @@ begin
 
   case Views.ViewMode of
   vmSingle: Views.SetViewsAnimationType(atStop);
-  vmFeed: Animated:=False;
+  vmFeed: Views.SetViewsAnimationType(atProcess);//Animated:=False;
   vmTumbs: Views.SetViewsAnimationType(atStart);
   end;
 
@@ -223,7 +222,7 @@ begin
   Result:=Assigned(View);
 end;
 
-function TMainForm.ViewIndexAt(const AbsolutePoint: TPointF): Integer;
+function TMainForm.ViewIndexAtPoint(const AbsolutePoint: TPointF): Integer;
 begin
   Result:=Views.IndexAtPoint(ScrollContent.AbsoluteToLocal(AbsolutePoint));
 end;
@@ -242,7 +241,7 @@ begin
   if Immediately then
     FAniCalc.ViewportPosition:=A.Point
   else
-    TAniCalculationsAccess(FAniCalc).MouseTarget:=A;
+    FAniCalc.MouseTarget:=A;
 
 end;
 
@@ -369,7 +368,7 @@ begin
     FScrollType:=stNone;
     //FAniCalc.Averaging := ssTouch in Shift;
     FAniCalc.MouseDown(X,Y);
-    TAniCalculationsAccess(FAniCalc).Shown:=True;
+    FAniCalc.Shown:=True;
   end;
 
 end;
@@ -382,9 +381,9 @@ begin
 
     FAniCalc.MouseLeave;
 
-    TAniCalculationsAccess(FAniCalc).Shown:=False;
+    FAniCalc.Shown:=False;
 
-    if not FLeave then ScrollToView(ViewIndexAt(AbsoluteCenterPoint));
+    if not FLeave then ScrollToView(ViewIndexAtPoint(AbsoluteCenterPoint));
 
     FLeave:=True;
 
@@ -446,7 +445,7 @@ begin
       end;
 
       if (Abs(Velocity.X)<100) and (Abs(Velocity.Y)<100) then
-        ViewIndex:=ViewIndexAt(AbsoluteCenterPoint)
+        ViewIndex:=ViewIndexAtPoint(AbsoluteCenterPoint)
       else
 //      if Abs(Velocity.X)>2000 then
 //        I:=PictureIndexAt(Rectangle2.LocalToAbsolute(PointF(X+Velocity.X/2,Y)))
@@ -467,7 +466,7 @@ end;
 procedure TMainForm.Rectangle2MouseWheel(Sender: TObject; Shift: TShiftState;
   WheelDelta: Integer; var Handled: Boolean);
 begin
-  TAniCalculationsAccess(FAniCalc).Shown:=True;
+  FAniCalc.Shown:=True;
   if Views.ViewMode=vmTumbs then
     FAniCalc.MouseWheel(0,-WheelDelta/2)
   else
@@ -576,9 +575,9 @@ begin
 //
 
     if not FLeave and (Views.ViewMode=vmFeed) then
-    CurrentView:=Views.ViewOf(ViewIndexAt(AbsoluteCenterPoint));
+    CurrentView:=Views.ViewOf(ViewIndexAtPoint(AbsoluteCenterPoint));
 
-    TAniCalculationsAccess(FAniCalc).Shown:=False;
+    FAniCalc.Shown:=False;
 
     (Self as IScene).ChangeScrollingState(nil,False);
 //

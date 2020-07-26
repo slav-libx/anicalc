@@ -61,7 +61,7 @@ begin
   for var Directory in TDirectory.GetDirectories(RootDirectory,
   function(const Path: string; const SearchRec: TSearchRec): Boolean
   begin
-    Result:=IncludeHiddenDirectories or not string(SearchRec.Name).StartsWith('.');
+    Result:=IncludeHiddenDirectories or (faHidden and SearchRec.Attr=0);
   end)
 
   do Result:=Result+GetFiles(Directory,IncludeHiddenDirectories);

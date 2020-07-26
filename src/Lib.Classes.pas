@@ -23,8 +23,6 @@ type
   TView = class(TRectangle)
   protected
     State: (StateEmpty,StateLoading,StateLoaded);
-//  private
-//    FAnimating: Boolean;
   protected
     FOnRead: TNotifyEvent;
     procedure AfterPaint; override;
@@ -167,6 +165,9 @@ begin
   atStop:
     if Loaded and not Animating(Self) then
       Opacity:=InterpolateSingle(VIEW_OPACITY,0,Time);
+  atStart:
+    if Loaded and not Animating(Self) then
+      Opacity:=InterpolateSingle(0,VIEW_OPACITY,Time);
   end;
 
 end;
@@ -286,7 +287,10 @@ begin
     for var View in Self do
     begin
       View.StartBounds:=ToLocalRect(View.StartBounds,View.ParentControl);
-      View.StartAnimation;
+//      if ViewMode=vmFeed then
+//      if View.AnimationType=atProcess then
+//      View.StartBounds.SetLocation(0,0);
+      View.StartAnimation;
     end;
 
     FAnimation.Restart(True);
