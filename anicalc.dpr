@@ -8,7 +8,8 @@ uses
   Lib.Files in 'src\Lib.Files.pas',
   Lib.Log in 'src\Lib.Log.pas',
   Lib.Pictures in 'src\Lib.Pictures.pas',
-  Lib.Ani in 'src\Lib.Ani.pas';
+  Lib.Ani in 'src\Lib.Ani.pas',
+  Lib.Animated in 'src\Lib.Animated.pas';
 
 {$R *.res}
 

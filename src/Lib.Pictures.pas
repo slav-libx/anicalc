@@ -177,13 +177,18 @@ begin
 
     ToLog('read '+Picture.PictureFileName);
 
-    var B:=TBitmap.CreateFromFile(Picture.PictureFileName);
+    try
 
-    ToLog('set bitmap '+Picture.PictureFileName);
+      var B:=TBitmap.CreateFromFile(Picture.PictureFileName);
 
-    Picture.SetBitmap(B);
+      ToLog('set bitmap '+Picture.PictureFileName);
 
-    B.Free;
+      Picture.SetBitmap(B);
+
+      B.Free;
+
+    except
+    end;
 
   end;
 

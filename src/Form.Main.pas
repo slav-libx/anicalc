@@ -21,7 +21,8 @@ uses
   Lib.Log,
   Lib.Classes,
   Lib.Pictures,
-  Lib.Files;
+  Lib.Files,
+  Lib.Animated;
 
 type
   TMainForm = class(TForm)
@@ -57,6 +58,7 @@ type
   private type
     TAniScroll = class(TAniCalculations);
   private
+    Ani: TTouchAnimation;
     FAniCalc: TAniScroll;
     ContentSize: TPointF;
     Views: TPictureList;
@@ -123,6 +125,10 @@ begin
   TumbsView:=CurrentView;
   TumbsViewport:=FAniCalc.ViewportPositionF;
 
+  Ani:=TTouchAnimation.Create(Self);
+  Ani.StartColor:=claNull;
+  Ani.SelectedColor:=MakeColor(0,0,0,60);
+
   RequestPermissionsExternalStorage(
   procedure(Granted: Boolean)
   begin
@@ -142,6 +148,8 @@ var PageSize,ViewSize: TPointF;
 begin
 
   if Views=nil then Exit;
+
+  Ani.Cancel;
 
   if Views.ViewMode in [vmSingle,vmFeed] then
   if Rectangle2.Width>Rectangle2.Height*1.5 then
@@ -348,7 +356,19 @@ end;
 
 procedure TMainForm.Rectangle2MouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
+var P: TPointF; V: TView;
 begin
+
+  Ani.Cancel;
+
+  P:=PointF(X,Y);
+  V:=ViewAtPoint(P);
+
+  if Assigned(V) then
+  begin
+    P:=V.AbsoluteToLocal(P);
+    Ani.Start(V,P);
+  end;
 
   //DoUpdateScrollingLimits;
   //DoUpdateScrollingLimits2;
@@ -425,6 +445,8 @@ var
   ViewIndex: Integer;
   Velocity: TPointD;
 begin
+
+  Ani.Leave;
 
   if FAniCalc <> nil then
   begin
