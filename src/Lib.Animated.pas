@@ -558,7 +558,11 @@ end;
 
 procedure TTouchAnimation.DoFinish;
 begin
-  if Inverse then HidePaint;
+  if Inverse then
+  begin
+    HidePaint;
+    Parent:=nil;
+  end;
 end;
 
 procedure TTouchAnimation.ShowPaint(Control: TFmxObject);
