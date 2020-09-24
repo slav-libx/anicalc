@@ -14,7 +14,8 @@ uses
   FMX.Graphics,
   FMX.Ani,
   FMX.Objects,
-  FMX.Controls;
+  FMX.Controls,
+  FMX.Styles.Objects;
 
 type
   TBrushAnimation = class(TAnimation)
@@ -64,6 +65,7 @@ type
   protected
     FFill: TBrush;
     PaintControl: TControl;
+    Target: TControl;
     FRect: TRectF;
     FFromColor: TAlphaColor;
     FToColor: TAlphaColor;
@@ -76,7 +78,7 @@ type
     FProcessColor: TAlphaColor;
     FNeedRepaint: Boolean;
     procedure SetColors;
-    procedure ShowPaint(Control: TFmxObject);
+    procedure ShowPaint;
     procedure HidePaint;
     procedure DoPaint(Canvas: TCanvas; const ARect: TRectF);
     procedure FirstFrame; override;
@@ -119,6 +121,8 @@ procedure CreateAnimation(Shape: TShape; AnimationClass: TBrushAnimationClass;
   const SelectedColor: TAlphaColor; ImmediatelyClick: Boolean=True); overload;
 
 function GetAnimation(Target: TFmxObject): TBrushAnimation;
+
+function AnimatedInterpolateColor(const Start, Stop: TAlphaColor; T: Single): TAlphaColor;
 
 implementation
 
@@ -492,7 +496,6 @@ begin
   FNotInverseDelay:=0.1;
   PaintControl:=TPaintControl.Create(Self);
   PaintControl.Align:=TAlignLayout.Contents;
-
   PaintControl.HitTest:=False;
 end;
 
@@ -508,7 +511,12 @@ var
   C: TCanvas;
   S: TSize;
   P: TPointF;
+  State: TCanvasSaveState;
 begin
+
+  State:=Canvas.SaveState;
+
+  Canvas.IntersectClipRect(ARect);
 
   if not Inverse then
   begin
@@ -547,17 +555,19 @@ begin
 
   FNeedRepaint:=False;
 
+  Canvas.RestoreState(State);
+
 end;
 
 procedure TTouchAnimation.FirstFrame;
 begin
-  ShowPaint(Parent);
+  ShowPaint;
 end;
 
 procedure TTouchAnimation.ProcessAnimation;
 begin
   FNeedRepaint:=True;
-  if Assigned(PaintControl) then PaintControl.Repaint;
+  //if Assigned(PaintControl) then PaintControl.InvalidateRect(PaintControl.LocalRect);// Repaint;
 end;
 
 procedure TTouchAnimation.DoFinish;
@@ -565,9 +575,12 @@ begin
   if Inverse then HidePaint;
 end;
 
-procedure TTouchAnimation.ShowPaint(Control: TFmxObject);
+procedure TTouchAnimation.ShowPaint;
 var SaveDisableAlign: Boolean;
 begin
+
+  PaintControl.Parent:=Target;
+  exit;
 
 //  if Assigned(PaintControl) then
 //  begin
@@ -577,17 +590,17 @@ begin
 //
 //  exit;
 
-  if (Control is TControl) and Assigned(PaintControl) and (Control<>PaintControl.Parent) then
-  begin
-    SaveDisableAlign:=TControlAccess(Control).FDisableAlign;
-    TControlAccess(Control).FDisableAlign:=True;
-    try
-      PaintControl.BoundsRect:=TControlAccess(Control).LocalRect;
-      Control.InsertObject(0,PaintControl);
-    finally
-      TControlAccess(Control).FDisableAlign:=SaveDisableAlign;
-    end;
-  end;
+//  if (Control is TControl) and Assigned(PaintControl) and (Control<>PaintControl.Parent) then
+//  begin
+//    SaveDisableAlign:=TControlAccess(Control).FDisableAlign;
+//    TControlAccess(Control).FDisableAlign:=True;
+//    try
+//      PaintControl.BoundsRect:=TControlAccess(Control).LocalRect;
+//      Control.InsertObject(0,PaintControl);
+//    finally
+//      TControlAccess(Control).FDisableAlign:=SaveDisableAlign;
+//    end;
+//  end;
 end;
 
 procedure TTouchAnimation.HidePaint;
@@ -595,6 +608,10 @@ var
   SaveDisableAlign: Boolean;
   Control: TFmxObject;
 begin
+
+  PaintControl.Parent:=nil;
+  exit;
+
   if Assigned(PaintControl) and Assigned(PaintControl.Parent) then
   begin
     Control:=PaintControl.Parent;
@@ -643,8 +660,10 @@ begin
   Delay:=NotInverseDelay;
 
   HidePaint;
+  Self.Target:=Target;
+
   //if Assigned(PaintControl) then PaintControl.Parent:=nil;
-  Parent:=Target;
+  //Parent:=Target;
 
   inherited Start;
 

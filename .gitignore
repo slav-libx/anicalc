@@ -78,3 +78,5 @@ __recovery/
 /iOSSimulator/
 
 classes.dex
+
+app.log

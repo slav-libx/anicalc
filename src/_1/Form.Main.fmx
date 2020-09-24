@@ -1,0 +1,107 @@
+object MainForm: TMainForm
+  Left = 0
+  Top = 0
+  Caption = 'Form1'
+  ClientHeight = 648
+  ClientWidth = 416
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  DesignerMasterStyle = 0
+  object Rectangle2: TRectangle
+    Touch.InteractiveGestures = [Pan]
+    OnGesture = Rectangle2Gesture
+    Align = Contents
+    Size.Width = 416.000000000000000000
+    Size.Height = 648.000000000000000000
+    Size.PlatformDefault = False
+    Stroke.Kind = None
+    Stroke.Thickness = 0.000000000000000000
+    OnClick = Rectangle2Click
+    OnMouseDown = Rectangle2MouseDown
+    OnMouseMove = Rectangle2MouseMove
+    OnMouseUp = Rectangle2MouseUp
+    OnMouseWheel = Rectangle2MouseWheel
+    OnMouseLeave = Rectangle2MouseLeave
+    OnPainting = Rectangle2Paint
+    OnPaint = Rectangle2Paint
+    OnResized = Rectangle2Resized
+    object ScrollContent: TRectangle
+      Fill.Kind = None
+      HitTest = False
+      Padding.Left = 20.000000000000000000
+      Padding.Top = 20.000000000000000000
+      Padding.Right = 20.000000000000000000
+      Padding.Bottom = 20.000000000000000000
+      Size.Width = 1025.000000000000000000
+      Size.Height = 385.000000000000000000
+      Size.PlatformDefault = False
+      Stroke.Kind = None
+      Stroke.Thickness = 0.000000000000000000
+    end
+  end
+  object Rectangle1: TRectangle
+    Anchors = [akTop, akRight, akBottom]
+    ClipChildren = True
+    Fill.Kind = None
+    Padding.Left = 1.000000000000000000
+    Padding.Right = 1.000000000000000000
+    Position.X = 408.000000000000000000
+    Position.Y = 2.000000000000000000
+    Size.Width = 6.000000000000000000
+    Size.Height = 644.000000000000000000
+    Size.PlatformDefault = False
+    Stroke.Kind = None
+    Stroke.Thickness = 0.000000000000000000
+    OnPainting = Rectangle5Painting
+    object Rectangle4: TRectangle
+      Align = Horizontal
+      Fill.Color = xFF757575
+      Position.X = 1.000000000000000000
+      Position.Y = 64.000000000000000000
+      Size.Width = 4.000000000000000000
+      Size.Height = 224.000000000000000000
+      Size.PlatformDefault = False
+      Stroke.Kind = None
+      Stroke.Thickness = 0.000000000000000000
+      XRadius = 2.000000000000000000
+      YRadius = 2.000000000000000000
+    end
+  end
+  object Rectangle5: TRectangle
+    Anchors = [akLeft, akRight, akBottom]
+    ClipChildren = True
+    Fill.Kind = None
+    Padding.Top = 1.000000000000000000
+    Padding.Bottom = 1.000000000000000000
+    Position.X = 2.000000000000000000
+    Position.Y = 640.000000000000000000
+    Size.Width = 412.000000000000000000
+    Size.Height = 6.000000000000000000
+    Size.PlatformDefault = False
+    Stroke.Kind = None
+    Stroke.Thickness = 0.000000000000000000
+    OnPainting = Rectangle5Painting
+    object Rectangle6: TRectangle
+      Align = Vertical
+      Fill.Color = xFF757575
+      Position.X = 40.000000000000000000
+      Position.Y = 1.000000000000000000
+      Size.Width = 291.000000000000000000
+      Size.Height = 4.000000000000000000
+      Size.PlatformDefault = False
+      Stroke.Kind = None
+      Stroke.Thickness = 0.000000000000000000
+      XRadius = 2.000000000000000000
+      YRadius = 2.000000000000000000
+    end
+  end
+  object Timer1: TTimer
+    Interval = 20
+    OnTimer = Timer1Timer
+    Left = 208
+    Top = 80
+  end
+end
