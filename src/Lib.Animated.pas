@@ -70,9 +70,9 @@ type
     FStartColor: TAlphaColor;
     FSelectedColor: TAlphaColor;
     FPointScale: TPointF;
-    FDuration: Single;
-    FInverseDuration: Single;
-    FNotInverseDelay: Single;
+    FPressingDuration: Single;
+    FUnpressingDuration: Single;
+    FPressingDelay: Single;
     FProcessColor: TAlphaColor;
     FNeedRepaint: Boolean;
     procedure SetColors;
@@ -90,7 +90,7 @@ type
     procedure Cancel;
     property StartColor: TAlphaColor read FStartColor write FStartColor;
     property SelectedColor: TAlphaColor read FSelectedColor write FSelectedColor;
-    property NotInverseDelay: Single read FNotInverseDelay write FNotInverseDelay;
+    property PressingDelay: Single read FPressingDelay write FPressingDelay;
   end;
 
   TShapeClass = class of TShape;
@@ -484,15 +484,11 @@ begin
   FFill.Bitmap.WrapMode:=TWrapMode.Tile;
   FStartColor:=claWhite;
   FSelectedColor:=$FFEDEDED;
-//  FDuration:=3.0;//0.9;
-//  FInverseDuration:=3.0;//0.2;
-//  FNotInverseDelay:=0.3;//0.1;
-  FDuration:=0.9;
-  FInverseDuration:=0.2;
-  FNotInverseDelay:=0.1;
+  FPressingDuration:=0.9;
+  FUnpressingDuration:=0.2;
+  FPressingDelay:=0.1;
   PaintControl:=TPaintControl.Create(Self);
   PaintControl.Align:=TAlignLayout.Contents;
-
   PaintControl.HitTest:=False;
 end;
 
@@ -568,15 +564,6 @@ end;
 procedure TTouchAnimation.ShowPaint(Control: TFmxObject);
 var SaveDisableAlign: Boolean;
 begin
-
-//  if Assigned(PaintControl) then
-//  begin
-//    //PaintControl.BoundsRect:=TControlAccess(Control).LocalRect;
-//    Control.InsertObject(0,PaintControl);
-//  end;
-//
-//  exit;
-
   if (Control is TControl) and Assigned(PaintControl) and (Control<>PaintControl.Parent) then
   begin
     SaveDisableAlign:=TControlAccess(Control).FDisableAlign;
@@ -606,8 +593,6 @@ begin
       TControlAccess(Control).FDisableAlign:=SaveDisableAlign;
     end;
   end;
-//  if Assigned(PaintControl) then PaintControl.Parent:=nil;
-//  Parent:=nil;
 end;
 
 procedure TTouchAnimation.SetColors;
@@ -639,11 +624,11 @@ begin
 
   SetColors;
 
-  Duration:=FDuration;
-  Delay:=NotInverseDelay;
+  Duration:=FPressingDuration;
+  Delay:=PressingDelay;
 
   HidePaint;
-  //if Assigned(PaintControl) then PaintControl.Parent:=nil;
+
   Parent:=Target;
 
   inherited Start;
@@ -657,7 +642,7 @@ begin
   begin
     Inverse:=True;
     SetColors;
-    Duration:=FInverseDuration*CurrentTime/FDuration; // depends on completion pressed animation
+    Duration:=FUnpressingDuration*CurrentTime/FPressingDuration; // depends on completion pressed animation
     Delay:=0.0;
     inherited Start;
   end else
