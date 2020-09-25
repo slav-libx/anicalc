@@ -4,6 +4,7 @@ object MainForm: TMainForm
   Caption = 'Form1'
   ClientHeight = 648
   ClientWidth = 416
+  Position = ScreenCenter
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]

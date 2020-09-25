@@ -68,10 +68,12 @@ type
     FLeave: Boolean;
     FDownPoint: TPointF;
     FScrollType: (stNone,stHScroll,stVScroll,stBoth);
+    FPositionOnChange: TNotifyEvent;
     procedure AniCalcChange(Sender: TObject);
     procedure AniCalcStart(Sender: TObject);
     procedure AniCalcStop(Sender: TObject);
     procedure DoUpdateScrollingLimits;
+    procedure OnScrollPositionChange(Sender: TObject);
     procedure LoadPictures;
     function AbsoluteCenterPoint: TPointF;
     function AbsolutePressedPoint: TPointF;
@@ -128,6 +130,12 @@ begin
   Ani:=TTouchAnimation.Create(Self);
   Ani.StartColor:=claNull;
   Ani.SelectedColor:=MakeColor(0,0,0,60);
+  Ani.PressingDelay:=0.2;
+  Ani.PressingDuration:=0.4;
+  Ani.UnpressingDuration:=0.2;
+
+  FPositionOnChange:=ScrollContent.Position.OnChange;
+  ScrollContent.Position.OnChange:=OnScrollPositionChange;
 
   RequestPermissionsExternalStorage(
   procedure(Granted: Boolean)
@@ -359,8 +367,6 @@ procedure TMainForm.Rectangle2MouseDown(Sender: TObject; Button: TMouseButton;
 var P: TPointF; V: TView;
 begin
 
-  Ani.Cancel;
-
   P:=PointF(X,Y);
   V:=ViewAtPoint(P);
 
@@ -446,8 +452,6 @@ var
   Velocity: TPointD;
 begin
 
-  Ani.Leave;
-
   if FAniCalc <> nil then
   begin
 
@@ -517,12 +521,16 @@ begin
 
 end;
 
+procedure TMainForm.OnScrollPositionChange(Sender: TObject);
+begin
+  FPositionOnChange(Sender);
+  Ani.Leave;
+end;
+
 procedure TMainForm.AniCalcChange(Sender: TObject);
 var
   NewViewPos, MaxScrollViewPos: Single;
 begin
-
-//  NewViewPos := FAniCalc.ViewportPosition.Y;
 
   ScrollContent.Position.Point:=-FAniCalc.ViewportPositionF;
 
@@ -578,6 +586,7 @@ end;
 
 procedure TMainForm.AniCalcStart(Sender: TObject);
 begin
+
 //  if IsRunningOnDesktop then
 //    DisableHitTestForControl(FScrollBar);
 //
