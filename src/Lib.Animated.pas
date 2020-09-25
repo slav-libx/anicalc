@@ -65,7 +65,7 @@ type
     FFill: TBrush;
     PaintControl: TControl;
     [weak]FTarget: TControl;
-    FLeave: Boolean;
+    FLeaveCalled: Boolean;
     FRect: TRectF;
     FFromColor: TAlphaColor;
     FToColor: TAlphaColor;
@@ -91,13 +91,14 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure Start(Target: TControl; P: TPointF);
-    procedure Leave(Immediately: Boolean=False);
+    procedure Leave(Immediately: Boolean=True);
     procedure Cancel;
     property StartColor: TAlphaColor read FStartColor write FStartColor;
     property SelectedColor: TAlphaColor read FSelectedColor write FSelectedColor;
     property PressingDuration: Single read FPressingDuration write FPressingDuration;
     property UnpressingDuration: Single read FUnpressingDuration write FUnpressingDuration;
     property PressingDelay: Single read FPressingDelay write FPressingDelay;
+    property Target: TControl read FTarget;
   end;
 
   TShapeClass = class of TShape;
@@ -593,7 +594,7 @@ begin
   if Inverse then
     HidePaint
   else
-    if FLeave then Fade;
+    if FLeaveCalled then Fade;
 end;
 
 procedure TTouchAnimation.ShowPaint;
@@ -638,10 +639,7 @@ begin
     else
       FToColor:=SelectedColor;
   end else begin
-    if Running then
-      FFromColor:=FProcessColor
-    else
-      FFromColor:=FStartColor;
+    FFromColor:=FStartColor;
     FToColor:=SelectedColor;
   end;
 
@@ -652,13 +650,13 @@ begin
 
   FPointScale:=PointF(P.X/Target.Width,P.Y/Target.Height);
 
-  FLeave:=False;
+  FLeaveCalled:=False;
 
   Inverse:=False;
 
   SetColors;
 
-  Duration:=FPressingDuration;
+  Duration:=PressingDuration;
   Delay:=PressingDelay;
 
   HidePaint;
@@ -675,7 +673,7 @@ begin
   begin
     Inverse:=True;
     SetColors;
-    Duration:=FUnpressingDuration*CurrentTime/FPressingDuration; // depends on completion pressed animation
+    Duration:=UnpressingDuration*CurrentTime/PressingDuration; // depends on completion pressed animation
     Delay:=0.0;
     inherited Start;
   end else
@@ -684,9 +682,9 @@ end;
 
 procedure TTouchAnimation.Leave(Immediately: Boolean);
 begin
-  if not FLeave then
+  if not FLeaveCalled then
   begin
-    FLeave:=True;
+    FLeaveCalled:=True;
     if not Running or Immediately then
       Fade
     else
@@ -697,7 +695,7 @@ end;
 
 procedure TTouchAnimation.Cancel;
 begin
-  FLeave:=True;
+  FLeaveCalled:=True;
   HidePaint;
   StopAtCurrent;
 end;

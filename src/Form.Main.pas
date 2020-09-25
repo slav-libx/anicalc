@@ -524,7 +524,7 @@ end;
 procedure TMainForm.OnScrollPositionChange(Sender: TObject);
 begin
   FPositionOnChange(Sender);
-  Ani.Leave;
+  Ani.Leave(False);
 end;
 
 procedure TMainForm.AniCalcChange(Sender: TObject);
