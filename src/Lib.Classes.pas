@@ -46,10 +46,14 @@ type
     function Empty: Boolean;
     function Loaded: Boolean;
     procedure Loading;
-    function ToString: string; override;
-    property OnRead: TNotifyEvent read FOnRead write FOnRead;
-  end;
-
+
+    function ToString: string; override;
+
+    property OnRead: TNotifyEvent read FOnRead write FOnRead;
+
+  end;
+
+
   TViewMode = (vmSingle,vmFeed,vmTumbs);
 
   TViewList = class(TObjectList<TView>)
@@ -72,14 +76,16 @@ type
     property ViewMode: TViewMode read FViewMode write FViewMode;
     property Size: TPointF read FSize write FSize;
   end;
-
+
+
 implementation
 
 const
   VIEW_OPACITY = 0.8;
 
 { TView }
-
+
+
 constructor TView.Create(AOwner: TComponent);
 begin
   inherited;
@@ -190,19 +196,21 @@ begin
   FAnimation.StopOnEvent:=True;
 
 end;
-
 destructor TViewList.Destroy;
 begin
   FAnimation.Free;
   inherited;
 end;
-
 procedure TViewList.OnAnimationProcess(Sender: TObject);
 var Time: Single;
-begin
-  Time:=InterpolateLinear(FAnimation.Time,0,1,FAnimation.Duration);
-  for var View in Self do View.Animate(Time);
-end;
+
+begin
+
+  Time:=InterpolateLinear(FAnimation.Time,0,1,FAnimation.Duration);
+
+  for var View in Self do View.Animate(Time);
+
+end;
 
 procedure TViewList.OnAnimationEvent(Sender: TObject);
 begin
@@ -265,13 +273,11 @@ begin
   Result.Topleft:=Control.LocalToAbsolute(R.TopLeft);
   Result.BottomRight:=Control.LocalToAbsolute(R.BottomRight);
 end;
-
 function ToLocalRect(const R: TRectF; Control: TControl): TRectF;
 begin
   Result.TopLeft:=Control.AbsoluteToLocal(R.TopLeft);
   Result.BottomRight:=Control.AbsoluteToLocal(R.BottomRight);
 end;
-
 procedure TViewList.Save;
 begin
   for var View in Self do
@@ -280,19 +286,19 @@ end;
 
 procedure TViewList.Apply(Animated: Boolean);
 begin
-
   if Animated then
   begin
-
     for var View in Self do
-    begin
-      View.StartBounds:=ToLocalRect(View.StartBounds,View.ParentControl);
-//      if ViewMode=vmFeed then
+
+    begin
+
+      View.StartBounds:=ToLocalRect(View.StartBounds,View.ParentControl);
+
+//      if ViewMode=vmFeed then
 //      if View.AnimationType=atProcess then
 //      View.StartBounds.SetLocation(0,0);
       View.StartAnimation;
     end;
-
     FAnimation.Restart(True);
 
   end else
@@ -305,5 +311,4 @@ procedure TViewList.SetViewsAnimationType(AnimationType: TView.TAnimationType);
 begin
   for var View in Self do View.AnimationType:=AnimationType;
 end;
-
 end.

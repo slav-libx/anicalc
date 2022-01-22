@@ -16,7 +16,8 @@ uses
   FMX.Objects,
   Lib.Log,
   Lib.Files,
-  Lib.Classes;
+  Lib.Classes,
+  Lib.OperationQueue;
 
 type
 
@@ -36,19 +37,19 @@ type
     function ToString: string; override;
   end;
 
-  TPictureQueue = TThreadedQueue<TPicture>;
-
-  TPictureReader = class(TThread)
-  private
-    Queue: TPictureQueue;
-  protected
-    procedure Execute; override;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure DoShutDown;
-    procedure Push(Picture: TPicture);
-  end;
+//  TPictureQueue = TThreadedQueue<TPicture>;
+//
+//  TPictureReader = class(TThread)
+//  private
+//    Queue: TPictureQueue;
+//  protected
+//    procedure Execute; override;
+//  public
+//    constructor Create;
+//    destructor Destroy; override;
+//    procedure DoShutDown;
+//    procedure Push(Picture: TPicture);
+//  end;
 
   TPictureList = class(TViewList)
   private const
@@ -56,7 +57,8 @@ type
   protected
     Headers: TObjectList<TTextView>;
     Cache: TList<TPicture>;
-    PictureReader: TPictureReader;
+//    PictureReader: TPictureReader;
+    PictureReader: TOperationQueue;
     procedure AddPicture(const PictureFileName: string);
     procedure ToCache(Picture: TPicture);
     procedure OnPictureRead(Sender: TObject);
@@ -78,8 +80,8 @@ implementation
 procedure TPicture.SetBitmap(B: TBitmap);
 begin
 
-  TThread.Synchronize(nil,procedure
-  begin
+//  TThread.Synchronize(nil,procedure
+//  begin
 
     BeginUpdate;
 
@@ -95,17 +97,18 @@ begin
 
     EndUpdate;
 
-  end);
+//  end);
 
 end;
 
 procedure TPicture.ReleaseBitmap;
 begin
 
-  BeginUpdate;
+  BeginUpdate;
 
-  Fill.Kind:=TBrushKind.None;
-  Fill.Bitmap.Bitmap:=nil;
+  Fill.Kind:=TBrushKind.None;
+
+  Fill.Bitmap.Bitmap:=nil;
 
   State:=StateEmpty;
 
@@ -137,62 +140,62 @@ end;
 
 { TPictureReader }
 
-constructor TPictureReader.Create;
-begin
-  Queue:=TPictureQueue.Create(1000);
-  inherited Create(True);
-  FreeOnTerminate:=True;
-end;
-
-destructor TPictureReader.Destroy;
-begin
-  Queue.Free;
-end;
-
-procedure TPictureReader.DoShutDown;
-begin
-  Queue.DoShutDown;
-end;
-
-procedure TPictureReader.Push(Picture: TPicture);
-begin
-  if Assigned(Picture) and Picture.Empty then
-  begin
-    ToLog('push '+Picture.PictureFileName);
-    Picture.Loading;
-    Queue.PushItem(Picture);
-    ToLog('pushed '+Picture.PictureFileName);
-  end;
-end;
-
-procedure TPictureReader.Execute;
-begin
-
-  while not Terminated do
-  begin
-
-    var Picture:=Queue.PopItem;
-
-    if Queue.ShutDown then Break;
-
-    ToLog('read '+Picture.PictureFileName);
-
-    try
-
-      var B:=TBitmap.CreateFromFile(Picture.PictureFileName);
-
-      ToLog('set bitmap '+Picture.PictureFileName);
-
-      Picture.SetBitmap(B);
-
-      B.Free;
-
-    except
-    end;
-
-  end;
-
-end;
+//constructor TPictureReader.Create;
+//begin
+//  Queue:=TPictureQueue.Create(1000);
+//  inherited Create(True);
+//  FreeOnTerminate:=True;
+//end;
+//
+//destructor TPictureReader.Destroy;
+//begin
+//  Queue.Free;
+//end;
+//
+//procedure TPictureReader.DoShutDown;
+//begin
+//  Queue.DoShutDown;
+//end;
+//
+//procedure TPictureReader.Push(Picture: TPicture);
+//begin
+//  if Assigned(Picture) and Picture.Empty then
+//  begin
+//    ToLog('push '+Picture.PictureFileName);
+//    Picture.Loading;
+//    Queue.PushItem(Picture);
+//    ToLog('pushed '+Picture.PictureFileName);
+//  end;
+//end;
+//
+//procedure TPictureReader.Execute;
+//begin
+//
+//  while not Terminated do
+//  begin
+//
+//    var Picture:=Queue.PopItem;
+//
+//    if Queue.ShutDown then Break;
+//
+//    ToLog('read '+Picture.PictureFileName);
+//
+//    try
+//
+//      var B:=TBitmap.CreateFromFile(Picture.PictureFileName);
+//
+//      ToLog('set bitmap '+Picture.PictureFileName);
+//
+//      Picture.SetBitmap(B);
+//
+//      B.Free;
+//
+//    except
+//    end;
+//
+//  end;
+//
+//end;
 
 { TPictureList }
 
@@ -207,14 +210,15 @@ begin
   inherited;
   Headers:=TObjectList<TTextView>.Create(False);
   Cache:=TList<TPicture>.Create;
-  PictureReader:=TPictureReader.Create;
-  PictureReader.Start;
+//  PictureReader:=TPictureReader.Create;
+//  PictureReader.Start;
+  PictureReader:=TOperationQueue.Create(10);
 end;
-
 destructor TPictureList.Destroy;
 begin
   Headers.Free;
-  PictureReader.DoShutDown;
+//  PictureReader.DoShutDown;
+  PictureReader.Free;
   Cache.Free;
   inherited;
 end;
@@ -292,7 +296,6 @@ begin
     View.Viewport.X:=Min(View.Viewport.X,FSize.X-PageSize.X);
 
 end;
-
 procedure TPictureList.PlacementTumbs(const PaddingRect: TRectF; const PageSize,ViewSize: TPointF);
 var
   PageRect,ShowRect,ViewRect: TRectF;
@@ -428,14 +431,56 @@ begin
   for var F in GetFiles(Directory,False) do AddPicture(F);
 end;
 
+type
+  TOperationLoad = class(TOperation)
+    B: TBitmap;
+    Picture: TPicture;
+    destructor Destroy; override;
+  end;
+
+destructor TOperationLoad.Destroy;
+begin
+  B.Free;
+  inherited;
+end;
+
 procedure TPictureList.OnPictureRead(Sender: TObject);
 begin
 
   var Picture:=TPicture(Sender);
 
   //PictureReader.Push(PictureOf(Picture.PictureIndex-1));
-  PictureReader.Push(Picture);
+//  PictureReader.Push(Picture);
   //PictureReader.Push(PictureOf(Picture.PictureIndex+1));
+
+  var Operation:=TOperationLoad.Create;
+
+  Operation.Picture:=Picture;
+
+  Operation.Main:=
+
+  procedure (Operation: TOperation)
+  begin
+
+    var OperationLoad:=TOperationLoad(Operation);
+
+    OperationLoad.B:=TBitmap.CreateFromFile(Picture.PictureFileName);
+
+  end;
+
+  Operation.Completion:=
+
+  procedure (Operation: TOperation)
+  begin
+
+    var OperationLoad:=TOperationLoad(Operation);
+
+    if Operation.IsCompleted then
+      Picture.SetBitmap(OperationLoad.B);
+
+  end;
+
+  PictureReader.AddOperation(Operation);
 
   ToCache(Picture);
 
@@ -446,7 +491,16 @@ begin
 
   var Picture:=TPicture(Sender);
 
-  PictureReader.Push(Picture);
+  if Assigned(Picture) and Picture.Empty then
+  begin
+    ToLog('push '+Picture.PictureFileName);
+    Picture.Loading;
+
+//    Queue.PushItem(Picture);
+    ToLog('pushed '+Picture.PictureFileName);
+  end;
+
+//  PictureReader.Push(Picture);
   //PictureReader.Push(PictureOf(Picture.PictureIndex-1));
   //PictureReader.Push(PictureOf(Picture.PictureIndex+1));
 

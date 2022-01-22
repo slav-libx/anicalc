@@ -17,7 +17,6 @@ implementation
 
 uses
   Androidapi.Helpers, Androidapi.JNI.Os;
-
 function GetPicturesPath: string;
 begin
   Result:=System.IOUtils.TPath.GetSharedPicturesPath;
@@ -34,25 +33,19 @@ end;
 
 procedure RequestPermissionsExternalStorage(Proc: TProc<Boolean>);
 begin
-
   {$IFDEF ANDROID}
-
   var WRITE_EXTERNAL_STORAGE:=JStringToString(TJManifest_permission.JavaClass.WRITE_EXTERNAL_STORAGE);
-
   {$ELSE}
-
   var WRITE_EXTERNAL_STORAGE:='';
-
   {$ENDIF}
-
   PermissionsService.DefaultService.RequestPermissions([WRITE_EXTERNAL_STORAGE],
   procedure(const APermissions: TArray<string>; const AGrantResults: TArray<TPermissionStatus>)
   begin
     Proc((Length(AGrantResults)=1) and (AGrantResults[0]=TPermissionStatus.Granted));
   end);
-
 end;
-
+
+
 function GetFiles(const RootDirectory: string; IncludeHiddenDirectories: Boolean): TArray<string>;
 begin
 
