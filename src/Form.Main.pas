@@ -133,8 +133,10 @@ begin
   Ani.PressingDelay:=0.2;
   Ani.PressingDuration:=0.4;
   Ani.UnpressingDuration:=0.2;
+
   FPositionOnChange:=ScrollContent.Position.OnChange;
   ScrollContent.Position.OnChange:=OnScrollPositionChange;
+
   RequestPermissionsExternalStorage(
   procedure(Granted: Boolean)
   begin

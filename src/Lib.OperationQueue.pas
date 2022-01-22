@@ -163,13 +163,23 @@ end;
 
 function TOperationQueue.GetOperationCount: Integer;
 begin
-  Result:=Operations.Count+Threads.Count;
+  TMonitor.Enter(Threads);
+  try
+    Result:=Operations.Count+Threads.Count;
+  finally
+    TMonitor.Exit(Threads);
+  end;
 end;
 
 procedure TOperationQueue.Cancel;
 begin
   Operations.Clear;
-  for var Thread in Threads.ToArray do Thread.Terminate;
+  TMonitor.Enter(Threads);
+  try
+    for var Thread in Threads.ToArray do Thread.Terminate;
+  finally
+    TMonitor.Exit(Threads);
+  end;
 end;
 
 procedure TOperationQueue.WaitThreads;
@@ -197,7 +207,13 @@ begin
   var Thread:=TOperationThread.Create(Operation,Event);
 
   Thread.OnDestroy:=OnDestroyThread;
-  Threads.Add(Thread);
+
+  TMonitor.Enter(Threads);
+  try
+    Threads.Add(Thread);
+  finally
+    TMonitor.Exit(Threads);
+  end;
 
 end;
 
@@ -206,7 +222,12 @@ begin
 
   // executing in concurrent thread
 
-  Threads.Remove(TOperationThread(Thread));
+  TMonitor.Enter(Threads);
+  try
+    Threads.Remove(TOperationThread(Thread));
+  finally
+    TMonitor.Exit(Threads);
+  end;
 
   if (Operations.Count>0) and AvailableConcurrent then
     DoOperation(Operations.Extract);

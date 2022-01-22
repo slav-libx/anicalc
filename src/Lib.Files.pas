@@ -45,7 +45,6 @@ begin
   end);
 end;
 
-
 function GetFiles(const RootDirectory: string; IncludeHiddenDirectories: Boolean): TArray<string>;
 begin
 
