@@ -20,7 +20,7 @@ uses
 
 type
 
-  TView = class(TRectangle)
+  TView = class(TControl)
   protected
     State: (StateEmpty,StateLoading,StateLoaded);
   protected
@@ -84,14 +84,14 @@ constructor TView.Create(AOwner: TComponent);
 begin
   inherited;
 
-  Fill.Bitmap.WrapMode:=TWrapMode.TileStretch;
-  Fill.Kind:=TBrushKind.None;
-  Fill.Color:=claSilver;
+//  Fill.Bitmap.WrapMode:=TWrapMode.TileStretch;
+//  Fill.Kind:=TBrushKind.None;
+//  Fill.Color:=claSilver;
+//
+//  Stroke.Kind:=TBrushKind.None;
+//  Stroke.Thickness:=0;
 
-  Stroke.Kind:=TBrushKind.None;
-  Stroke.Thickness:=0;
-
-  HitTest:=False;
+//  HitTest:=False;
   Opacity:=VIEW_OPACITY;
 
 end;

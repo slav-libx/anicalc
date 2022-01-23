@@ -22,11 +22,17 @@ uses
 type
 
   TPicture = class(TView)
+  private
+    FBitmap: TBitmap;
+  protected
+    procedure Paint; override;
+    procedure Disappear; override;
   public
     PictureFileName: string;
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure SetBitmap(B: TBitmap);
     procedure ReleaseBitmap;
-    function ToString: string; override;
   end;
 
   TTextView = class(TView)
@@ -34,7 +40,6 @@ type
     Text: TText;
   public
     constructor Create(AOwner: TComponent); override;
-    function ToString: string; override;
   end;
 
   TPictureList = class(TViewList)
@@ -62,45 +67,55 @@ implementation
 
 { TPicture }
 
+constructor TPicture.Create(AOwner: TComponent);
+begin
+  inherited;
+  FBitmap:=TBitmap.Create;
+end;
+
+destructor TPicture.Destroy;
+begin
+  FBitmap.Free;
+  inherited;
+end;
+
 procedure TPicture.SetBitmap(B: TBitmap);
 begin
 
-  BeginUpdate;
-
   Opacity:=0;
 
-  Fill.Bitmap.Bitmap:=B;
+  FBitmap.Assign(B);
 
   State:=StateLoaded;
 
-  Fill.Kind:=TBrushKind.Bitmap;
-
   ShowAnimated;
-
-  EndUpdate;
 
 end;
 
 procedure TPicture.ReleaseBitmap;
 begin
 
-  BeginUpdate;
-
-  Fill.Kind:=TBrushKind.None;
-
-  Fill.Bitmap.Bitmap:=nil;
+  FBitmap.Assign(nil);
 
   State:=StateEmpty;
 
-  EndUpdate;
+end;
+
+procedure TPicture.Paint;
+begin
+
+  if FBitmap.IsEmpty then
+    Canvas.ClearRect(LocalRect,claSilver)
+  else begin
+    var SourceRect:=FBitmap.BoundsF;
+    Canvas.DrawBitmap(FBitmap,SourceRect,LocalRect,Opacity,True);
+  end;
 
 end;
 
-function TPicture.ToString: string;
+procedure TPicture.Disappear;
 begin
-  Result:=PictureFilename+' ('+
-    Fill.Bitmap.Bitmap.Width.ToString+' x '+
-    Fill.Bitmap.Bitmap.Height.ToString+')';
+  FBitmap.Assign(nil);
 end;
 
 { TTextView }
@@ -111,11 +126,6 @@ begin
   Text:=TText.Create(Self);
   Text.Parent:=Self;
   Text.Align:=TAlignLayout.Client;
-end;
-
-function TTextView.ToString: string;
-begin
-  Result:=Text.Text;
 end;
 
 { TPictureList }
@@ -133,6 +143,7 @@ begin
   Cache:=TList<TPicture>.Create;
   OperationQueue:=TOperationQueue.Create(Min(4,TThread.ProcessorCount));
 end;
+
 destructor TPictureList.Destroy;
 begin
   Headers.Free;

@@ -25,13 +25,18 @@ uses
   Lib.Animated;
 
 type
+  TScrollContent = class(TControl)
+  protected
+    procedure DoRealign; override;
+    function ObjectAtPoint(ScreenPoint: TPointF): IControl; override;
+  end;
+
   TMainForm = class(TForm)
     Rectangle2: TRectangle;
     Rectangle1: TRectangle;
     Rectangle4: TRectangle;
     Rectangle5: TRectangle;
     Rectangle6: TRectangle;
-    ScrollContent: TRectangle;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Rectangle2MouseDown(Sender: TObject; Button: TMouseButton;
@@ -60,6 +65,7 @@ type
   private
     Ani: TTouchAnimation;
     FAniCalc: TAniScroll;
+    ScrollContent: TScrollContent;
     ContentSize: TPointF;
     Views: TPictureList;
     CurrentView: TView;
@@ -95,12 +101,26 @@ implementation
 
 {$R *.fmx}
 
+procedure TScrollContent.DoRealign;
+begin
+
+end;
+
+function TScrollContent.ObjectAtPoint(ScreenPoint: TPointF): IControl;
+begin
+  Result:=nil;
+end;
+
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
 
   {$IFDEF MSWINDOWS}
   InitLog(System.IOUtils.TPath.GetLibraryPath);
   {$ENDIF}
+
+  ScrollContent:=TScrollContent.Create(Self);
+  ScrollContent.Padding.Rect:=RectF(20,20,20,20);
+  ScrollContent.Parent:=Rectangle2;
 
   FAniCalc:=TAniScroll.Create(nil);
 

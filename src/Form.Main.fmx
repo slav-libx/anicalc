@@ -29,19 +29,6 @@ object MainForm: TMainForm
     OnPainting = Rectangle2Paint
     OnPaint = Rectangle2Paint
     OnResized = Rectangle2Resized
-    object ScrollContent: TRectangle
-      Fill.Kind = None
-      HitTest = False
-      Padding.Left = 20.000000000000000000
-      Padding.Top = 20.000000000000000000
-      Padding.Right = 20.000000000000000000
-      Padding.Bottom = 20.000000000000000000
-      Size.Width = 1025.000000000000000000
-      Size.Height = 385.000000000000000000
-      Size.PlatformDefault = False
-      Stroke.Kind = None
-      Stroke.Thickness = 0.000000000000000000
-    end
   end
   object Rectangle1: TRectangle
     Anchors = [akTop, akRight, akBottom]
