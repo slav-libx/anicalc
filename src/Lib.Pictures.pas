@@ -43,7 +43,7 @@ type
   protected
     Headers: TObjectList<TTextView>;
     Cache: TList<TPicture>;
-    PictureReader: TOperationQueue;
+    OperationQueue: TOperationQueue;
     procedure AddPicture(const PictureFileName: string);
     procedure ToCache(Picture: TPicture);
     procedure OnPictureRead(Sender: TObject);
@@ -131,12 +131,12 @@ begin
   inherited;
   Headers:=TObjectList<TTextView>.Create(False);
   Cache:=TList<TPicture>.Create;
-  PictureReader:=TOperationQueue.Create(3);
+  OperationQueue:=TOperationQueue.Create(Min(4,TThread.ProcessorCount));
 end;
 destructor TPictureList.Destroy;
 begin
   Headers.Free;
-  PictureReader.Free;
+  OperationQueue.Free;
   Cache.Free;
   inherited;
 end;
@@ -399,7 +399,7 @@ begin
 
     end;
 
-    PictureReader.AddOperation(Operation);
+    OperationQueue.AddOperation(Operation);
 
     ToCache(Picture);
 

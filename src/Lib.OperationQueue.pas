@@ -47,9 +47,10 @@ type
       destructor Destroy; override;
     end;
 
-  private type
-    TThreads = TList<TOperationThread>;
+    TThreads = class(TList<TOperationThread>);
+
     TOperations = TObjectQueue<TOperation>;
+
   private
     Event: TCountdownEvent;
     FMaxConcurrentOperationCount: Integer;
@@ -141,6 +142,32 @@ begin
   end;
 end;
 
+type
+  TLocker = class(TInterfacedObject)
+  private
+    [weak] FLockObject: TObject;
+  public
+    constructor Create(LockObject: TObject);
+    destructor Destroy; override;
+  end;
+
+constructor TLocker.Create(LockObject: TObject);
+begin
+  FLockObject:=LockObject;
+  TMonitor.Enter(FLockObject);
+end;
+
+destructor TLocker.Destroy;
+begin
+  TMonitor.Exit(FLockObject);
+  inherited;
+end;
+
+function Lock(LockObject: TObject): IInterface;
+begin
+  Result:=TLocker.Create(LockObject);
+end;
+
 { TOperationQueue }
 
 constructor TOperationQueue.Create(MaxConcurrentOperationCount: Integer=4);
@@ -163,23 +190,17 @@ end;
 
 function TOperationQueue.GetOperationCount: Integer;
 begin
-  TMonitor.Enter(Threads);
-  try
-    Result:=Operations.Count+Threads.Count;
-  finally
-    TMonitor.Exit(Threads);
-  end;
+  Result:=Operations.Count+Threads.Count;
 end;
 
 procedure TOperationQueue.Cancel;
 begin
+
   Operations.Clear;
-  TMonitor.Enter(Threads);
-  try
-    for var Thread in Threads.ToArray do Thread.Terminate;
-  finally
-    TMonitor.Exit(Threads);
-  end;
+
+  Lock(Threads);
+  for var Thread in Threads.ToArray do Thread.Terminate;
+
 end;
 
 procedure TOperationQueue.WaitThreads;
@@ -208,12 +229,8 @@ begin
 
   Thread.OnDestroy:=OnDestroyThread;
 
-  TMonitor.Enter(Threads);
-  try
-    Threads.Add(Thread);
-  finally
-    TMonitor.Exit(Threads);
-  end;
+  Lock(Threads);
+  Threads.Add(Thread);
 
 end;
 
@@ -222,12 +239,8 @@ begin
 
   // executing in concurrent thread
 
-  TMonitor.Enter(Threads);
-  try
-    Threads.Remove(TOperationThread(Thread));
-  finally
-    TMonitor.Exit(Threads);
-  end;
+  Lock(Threads);
+  Threads.Remove(TOperationThread(Thread));
 
   if (Operations.Count>0) and AvailableConcurrent then
     DoOperation(Operations.Extract);
